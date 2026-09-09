@@ -1,6 +1,6 @@
 import { parseCollection, serializeCollection } from './parser.js';
 import { loadCards, buildInventory, resolve } from './db.js';
-import { suggestDecks, deckToText, RULES } from './deckbuilder.js';
+import { suggestDecks, deckToText, deckTitle, RULES } from './deckbuilder.js';
 
 const KEY = { coll: 'rb.collection.v1', meta: 'rb.metadecks.v1', friends: 'rb.friends.v1' };
 const DOMAINS = ['calm', 'mind', 'body', 'fury', 'order', 'chaos', 'colorless'];
@@ -148,8 +148,8 @@ function viewDecks() {
     <div class="decklist">${list.map((d, i) => `
       <button class="deckcard" data-deck="${i}">
         <div class="row" style="justify-content:space-between;align-items:flex-start">
-          <div><div class="t">${esc(d.legend.name)}</div>
-            <div class="m">${dots(d.identity)} ${d.identity.join(' + ')}</div></div>
+          <div><div class="t">${esc(d.champion ?? d.legend.name)}</div>
+            <div class="m">${d.champion ? esc(d.legend.name) + ' · ' : ''}${dots(d.identity)} ${d.identity.join(' + ')}</div></div>
           <span class="badge ${d.complete ? 'ok' : 'warn'}">${d.complete ? 'komplett' : 'unvollständig'}</span>
         </div>
         <div class="m" style="margin-top:10px">
@@ -167,7 +167,7 @@ function viewDeckDetail(d) {
 
   return `
     <div class="row" style="margin-bottom:14px"><button class="btn sm" id="backDecks">← Alle Decks</button></div>
-    <h2>${esc(d.legend.name)} <span class="badge ${d.complete ? 'ok' : 'warn'}">${d.complete ? 'komplett spielbar' : 'unvollständig'}</span></h2>
+    <h2>${esc(deckTitle(d))} <span class="badge ${d.complete ? 'ok' : 'warn'}">${d.complete ? 'komplett spielbar' : 'unvollständig'}</span></h2>
     <p class="sub">${dots(d.identity)} ${d.identity.join(' + ')} · Deckwert ${d.score} · Ø ${d.avgEnergy} Energie
       ${d.complete ? '' : ` · es fehlen ${d.missingSlots.main} Hauptdeck-, ${d.missingSlots.runes} Runen- und ${d.missingSlots.battlefields} Schlachtfeldkarten`}</p>
 
@@ -179,7 +179,7 @@ function viewDeckDetail(d) {
         <div class="curve">${curve}</div>
       </div>
       <div>
-        <h3>Legende</h3><div class="lines">${lineRow(1, d.legend)}</div>
+        <h3>Legende</h3><div class="lines">${lineRow(1, d.legend, deckTitle(d))}</div>
         <h3>Runen · ${d.counts.runes}/12</h3>
         <div class="lines">${d.runes.map(m => lineRow(m.count, m.card)).join('')}</div>
         <h3>Schlachtfelder · ${d.counts.battlefields}/3</h3>
@@ -196,7 +196,7 @@ function viewDeckDetail(d) {
     </div>`;
 }
 
-const lineRow = (n, c) => `<div class="line"><span class="c">${n}×</span><span class="n">${esc(c.name)}</span>
+const lineRow = (n, c, label) => `<div class="line"><span class="c">${n}×</span><span class="n">${esc(label ?? c.name)}</span>
   <span class="e">${dots(c.domains)}${c.energy != null ? ' ' + c.energy + 'E' : ''} · ${c.rarity}</span></div>`;
 
 /* --- Meta-Decks --- */
@@ -262,7 +262,7 @@ function viewWunsch() {
     a.rows.filter(r => r.missing > 0).forEach(r => add(r.card, r.missing, d.name));
   }
   const top = decks().slice(0, 3);
-  top.forEach(d => d.upgrades.slice(0, 12).forEach(u => add(u.card, u.missing, d.legend.name)));
+  top.forEach(d => d.upgrades.slice(0, 12).forEach(u => add(u.card, u.missing, d.champion ?? d.legend.name)));
 
   const list = [...want.values()].sort((a, b) => b.why.size - a.why.size || b.n - a.n);
   const totalCards = list.reduce((s, x) => s + x.n, 0);

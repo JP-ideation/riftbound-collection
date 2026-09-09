@@ -57,6 +57,30 @@ function scoreCard(card, legend, tagWeight) {
   return s;
 }
 
+/**
+ * Zu welchem Champion gehört eine Legende?
+ * Legenden heißen nur nach ihrem Beinamen ("Heart of the Tempest"), tragen den
+ * Championnamen aber als Tag. Championeinheiten heißen "Kennen, Keeper of
+ * Balance" – deren Namensprefix liefert die Liste gültiger Championnamen.
+ */
+const champCache = new WeakMap();
+function championNames(allCards) {
+  let hit = champCache.get(allCards);
+  if (hit) return hit;
+  hit = new Set();
+  for (const c of allCards) if (c.type === 'unit' && c.name.includes(', ')) hit.add(c.name.split(', ')[0]);
+  champCache.set(allCards, hit);
+  return hit;
+}
+
+export function championOf(legend, allCards) {
+  const names = championNames(allCards);
+  return (legend.tags ?? []).find(t => names.has(t)) ?? null;
+}
+
+/** "Kennen – Heart of the Tempest", oder nur der Beiname wenn kein Champion bekannt. */
+export const deckTitle = deck => (deck.champion ? `${deck.champion} – ${deck.legend.name}` : deck.legend.name);
+
 /** Häufigkeit von Tags im spielbaren Pool -> Stamm-Dichte 0..1 */
 function tagWeights(pool) {
   const counts = new Map();
@@ -146,7 +170,8 @@ export function buildDeck(inventory, legendEntry, allCards) {
   const complete = total === RULES.MAIN && runeCount === RULES.RUNES && battlefields.length === RULES.BATTLEFIELDS;
 
   return {
-    legend, identity: [...identity], main, runes, battlefields, curve,
+    legend, champion: championOf(legend, allCards),
+    identity: [...identity], main, runes, battlefields, curve,
     counts: { main: total, runes: runeCount, battlefields: battlefields.length },
     missingSlots: {
       main: RULES.MAIN - total,
@@ -225,6 +250,6 @@ export function deckToText(deck) {
   };
   const line = (n, c) => `${n} ${c.name} (${c.set}) #${num(c)}`;
   const sec = (title, list) => list.length ? `\n// ${title}\n` + list.map(x => line(x.count, x.card)).join('\n') : '';
-  return `// Legende\n${line(1, deck.legend)}`
+  return `// ${deckTitle(deck)}\n// Legende\n${line(1, deck.legend)}`
     + sec('Hauptdeck', deck.main) + sec('Runen', deck.runes) + sec('Schlachtfelder', deck.battlefields) + '\n';
 }
