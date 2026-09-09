@@ -1,0 +1,13 @@
+{
+  "name": "Riftbound Sammlung & Deckbau",
+  "short_name": "Riftbound",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0d1117",
+  "theme_color": "#0d1117",
+  "description": "Riftbound-Sammlung verwalten, bestes spielbares Deck berechnen, fehlende Karten finden.",
+  "icons": [
+    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
