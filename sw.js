@@ -1,31 +1,53 @@
-/* Offline-Cache: App-Shell und Kartendaten. */
-const V = 'rb-v1';
+/**
+ * Offline-Betrieb.
+ *
+ * App-Dateien: immer zuerst aus dem Netz mit Revalidierung, Cache nur als
+ * Rueckfall. So zieht ein neuer Deploy sofort, statt eine alte Version
+ * festzuhalten. Kartenbilder vom Riot-CDN: Cache zuerst, die aendern sich nicht.
+ */
+const V = 'rb-shell-v2';
+const IMG = 'rb-img-v1';
 const SHELL = ['./', 'index.html', 'app.css', 'manifest.webmanifest',
   'js/app.js', 'js/db.js', 'js/parser.js', 'js/deckbuilder.js', 'data/cards.json', 'icons/icon.svg'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(V).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));
 });
+
 self.addEventListener('activate', e => {
-  e.waitUntil(caches.keys().then(k => Promise.all(k.filter(x => x !== V).map(x => caches.delete(x)))).then(() => self.clients.claim()));
+  e.waitUntil((async () => {
+    for (const k of await caches.keys()) if (k !== V && k !== IMG) await caches.delete(k);
+    await self.clients.claim();
+  })());
 });
+
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
   const url = new URL(e.request.url);
-  // Kartenbilder vom Riot-CDN: erst Cache, dann Netz (und dauerhaft ablegen)
+
   if (url.hostname.endsWith('rgpub.io')) {
-    e.respondWith(caches.open(V + '-img').then(async c => {
+    e.respondWith((async () => {
+      const c = await caches.open(IMG);
       const hit = await c.match(e.request);
       if (hit) return hit;
       const res = await fetch(e.request);
       if (res.ok) c.put(e.request, res.clone());
       return res;
-    }));
+    })());
     return;
   }
-  // App selbst: Netz zuerst, Cache als Rückfall
-  e.respondWith(fetch(e.request).then(r => {
-    caches.open(V).then(c => c.put(e.request, r.clone())).catch(() => {});
-    return r.clone();
-  }).catch(() => caches.match(e.request).then(r => r ?? caches.match('index.html'))));
+
+  if (url.origin !== self.location.origin) return;
+
+  e.respondWith((async () => {
+    try {
+      const res = await fetch(e.request, { cache: 'no-cache' });
+      if (res.ok) (await caches.open(V)).put(e.request, res.clone());
+      return res;
+    } catch {
+      return (await caches.match(e.request))
+          ?? (await caches.match('index.html'))
+          ?? Response.error();
+    }
+  })());
 });
