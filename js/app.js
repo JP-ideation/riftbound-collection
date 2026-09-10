@@ -451,5 +451,12 @@ document.addEventListener('change', e => {
   if (saved) applyCollection(saved, false);
   renderHead();
   render();
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+  // Fehler nicht verschlucken: ohne Service Worker gibt es keinen Offline-
+  // Betrieb und keine Installation auf dem Homebildschirm - das muss sichtbar
+  // sein, statt still zu scheitern.
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').catch(err => {
+      console.warn('Service Worker nicht registriert - App laeuft ohne Offline-Betrieb:', err.message);
+    });
+  }
 })();
