@@ -3,6 +3,12 @@ name: Deploy auf GitHub Pages
 on:
   push:
     branches: [main]
+  # Pushes des Datenworkflows laufen unter GITHUB_TOKEN und loesen per
+  # GitHub-Design KEINEN push-Event aus. Ohne diesen Trigger landen neue
+  # Kartensets zwar im Repo, aber nie auf der Live-Seite.
+  workflow_run:
+    workflows: ["Kartendaten aktualisieren"]
+    types: [completed]
   workflow_dispatch:
 
 permissions:
@@ -16,6 +22,8 @@ concurrency:
 
 jobs:
   deploy:
+    # Nach einem Datenlauf nur deployen, wenn dieser erfolgreich war.
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     environment:
       name: github-pages

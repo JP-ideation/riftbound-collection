@@ -31,6 +31,14 @@ https://content.publishing.riotgames.com/publishing-content/v2.0/public/channel/
 Workflow `update-cards.yml` läuft täglich und committet neue Sets automatisch –
 die App ist damit immer auf dem aktuellen Stand, ohne dass du etwas tust.
 
+Damit das greift, muss zweierlei stimmen:
+
+* **Settings → Actions → General → Workflow permissions** auf *Read and write
+  permissions*, sonst darf der Workflow den Commit nicht pushen.
+* `deploy.yml` hat einen `workflow_run`-Trigger. Pushes, die ein Workflow mit
+  `GITHUB_TOKEN` macht, lösen per GitHub-Design keinen `push`-Event aus – ohne
+  diesen Trigger lägen neue Karten im Repo, aber nicht auf der Live-Seite.
+
 ## Importformat
 
 Eine Karte pro Zeile, das übliche Decklisten-Format:
