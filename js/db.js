@@ -38,7 +38,17 @@ function codeToken(card) {
  */
 function prefer(map, key, card) {
   const cur = map.get(key);
-  if (!cur || (rank(card) > rank(cur))) map.set(key, card);
+  if (!cur || better(card, cur)) map.set(key, card);
+}
+
+/**
+ * Riot fuehrt denselben Kartennamen teils mehrfach mit abweichenden Daten –
+ * mal fehlt der Erinnerungstext in Klammern, mal ein Tag. Bei gleichem Rang
+ * gewinnt deshalb die ausfuehrlichere Fassung.
+ */
+function better(a, b) {
+  if (rank(a) !== rank(b)) return rank(a) > rank(b);
+  return (a.text?.length ?? 0) > (b.text?.length ?? 0);
 }
 const altArt = c => /\d+[a-z]/.test(c.code ?? '');
 const rank = c => (c.rarity === 'showcase' ? 0 : 4) + (altArt(c) ? 0 : 2) + (c.variant ? 0 : 1);

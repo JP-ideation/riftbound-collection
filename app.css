@@ -94,6 +94,25 @@ textarea { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-siz
 .line.missing { background: rgba(248,81,73,.07); }
 .line.missing .c { color: var(--bad); }
 
+.guide { margin-bottom: 24px; }
+.guide h4 { margin: 22px 0 4px; font-size: 14px; letter-spacing: .3px; }
+.guide ul { margin: 0 0 4px; padding-left: 20px; }
+.guide ul li { margin-bottom: 5px; }
+.guide ul.good li::marker { color: var(--ok); }
+.guide ul.bad li::marker { color: var(--warn); }
+.guide ul.plan li::marker { color: var(--accent); }
+.guide .line .e { white-space: pre-line; }
+
+.minicards { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px; }
+.minicard { position: relative; border-radius: 8px; overflow: hidden; background: var(--bg3);
+  border: 1px solid var(--line); aspect-ratio: 744/1039; }
+.minicard img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.minicard .qty { position: absolute; top: 4px; right: 4px; background: rgba(0,0,0,.85);
+  border: 1px solid var(--accent); color: var(--accent); border-radius: 5px;
+  padding: 0 6px; font-size: 11px; font-weight: 700; }
+.minicard .nm { position: absolute; bottom: 0; left: 0; right: 0; padding: 12px 5px 4px;
+  background: linear-gradient(transparent, rgba(0,0,0,.92)); font-size: 10.5px; line-height: 1.2; }
+
 .bar-track { height: 7px; background: var(--bg3); border-radius: 4px; overflow: hidden; margin-top: 6px; }
 .bar-fill { height: 100%; background: var(--ok); }
 .bar-fill.warn { background: var(--warn); }

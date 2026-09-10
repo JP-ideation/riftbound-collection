@@ -5,10 +5,11 @@
  * Rueckfall. So zieht ein neuer Deploy sofort, statt eine alte Version
  * festzuhalten. Kartenbilder vom Riot-CDN: Cache zuerst, die aendern sich nicht.
  */
-const V = 'rb-shell-v2';
+const V = 'rb-shell-v3';
 const IMG = 'rb-img-v1';
 const SHELL = ['./', 'index.html', 'app.css', 'manifest.webmanifest',
-  'js/app.js', 'js/db.js', 'js/parser.js', 'js/deckbuilder.js', 'data/cards.json', 'icons/icon.svg'];
+  'js/app.js', 'js/db.js', 'js/parser.js', 'js/deckbuilder.js', 'js/guide.js',
+  'data/cards.json', 'icons/icon.svg'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(V).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));
@@ -45,9 +46,16 @@ self.addEventListener('fetch', e => {
       if (res.ok) (await caches.open(V)).put(e.request, res.clone());
       return res;
     } catch {
-      return (await caches.match(e.request))
-          ?? (await caches.match('index.html'))
-          ?? Response.error();
+      const hit = await caches.match(e.request);
+      if (hit) return hit;
+      // Nur echte Seitenaufrufe duerfen auf die App-Huelle zurueckfallen.
+      // Fuer ein fehlendes Skript oder JSON waere das ein stilles HTML-in-JS
+      // und die App braeche unverstaendlich ab.
+      if (e.request.mode === 'navigate') {
+        const shell = await caches.match('index.html');
+        if (shell) return shell;
+      }
+      return new Response('Offline und nicht im Cache', { status: 504, statusText: 'Offline' });
     }
   })());
 });

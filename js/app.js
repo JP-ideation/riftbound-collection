@@ -1,6 +1,7 @@
 import { parseCollection, serializeCollection } from './parser.js';
 import { loadCards, buildInventory, resolve } from './db.js';
 import { suggestDecks, deckToText, deckTitle, RULES } from './deckbuilder.js';
+import { buildGuide } from './guide.js';
 
 const KEY = { coll: 'rb.collection.v1', meta: 'rb.metadecks.v1', friends: 'rb.friends.v1' };
 const DOMAINS = ['calm', 'mind', 'body', 'fury', 'order', 'chaos', 'colorless'];
@@ -171,6 +172,8 @@ function viewDeckDetail(d) {
     <p class="sub">${dots(d.identity)} ${d.identity.join(' + ')} · Deckwert ${d.score} · Ø ${d.avgEnergy} Energie
       ${d.complete ? '' : ` · es fehlen ${d.missingSlots.main} Hauptdeck-, ${d.missingSlots.runes} Runen- und ${d.missingSlots.battlefields} Schlachtfeldkarten`}</p>
 
+    ${guideBlock(d)}
+
     <div class="cols">
       <div>
         <h3>Hauptdeck · ${d.counts.main}/40</h3>
@@ -194,6 +197,49 @@ function viewDeckDetail(d) {
         </div>
       </div>
     </div>`;
+}
+
+/* --- Spielhilfe --- */
+function guideBlock(d) {
+  const g = buildGuide(d);
+  const mini = (c, n) => `<div class="minicard"><img loading="lazy" src="${img(c, 220)}" alt="${esc(c.name)}">
+    <span class="qty">${n}</span><div class="nm">${esc(c.name)}</div></div>`;
+  const list = (items, cls) => items.length
+    ? `<ul class="${cls}">${items.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : '';
+
+  return `<div class="card guide">
+    <div class="row" style="gap:10px;margin-bottom:10px">
+      <h3 style="margin:0">So spielst du das Deck</h3>
+      <span class="badge ok">${esc(g.archetype.name)}</span>
+    </div>
+    <p style="margin:0 0 14px">${esc(g.archetype.text)}</p>
+    ${list(g.plan, 'plan')}
+
+    <h4>Schlüsselkarten</h4>
+    <p class="sub" style="margin:0 0 10px">Darauf läuft das Deck hinaus – diese Karten willst du ausspielen und schützen.</p>
+    <div class="minicards">${g.keyCards.map(k => mini(k.card, k.count)).join('')}</div>
+
+    <h4>Startblatt</h4>
+    <p class="sub" style="margin:0 0 10px">Günstige starke Karten, auf die du beim Mulligan hoffst.</p>
+    <div class="lines">${g.mulligan.map(m => lineRow(m.count, m.card)).join('')}</div>
+
+    <div class="cols" style="margin-top:20px">
+      <div><h4 style="margin-top:0">Stärken</h4>${list(g.strengths, 'good') || '<p class="sub">Nichts, was heraussticht.</p>'}</div>
+      <div><h4 style="margin-top:0">Schwächen</h4>${list(g.weaknesses, 'bad') || '<p class="sub">Keine auffälligen Lücken.</p>'}</div>
+    </div>
+
+    <h4>Was deine Legende macht</h4>
+    <div class="lines"><div class="line" style="display:block">
+      <b>${esc(deckTitle(d))}</b><br><span class="e">${esc(d.legend.text || 'Kein Fähigkeitstext hinterlegt.')}</span>
+    </div></div>
+
+    <h4>Deine Schlachtfelder</h4>
+    <div class="lines">${d.battlefields.map(b => `<div class="line" style="display:block">
+      <b>${esc(b.card.name)}</b><br><span class="e">${esc(b.card.text || '–')}</span></div>`).join('')}</div>
+
+    <p class="sub" style="margin:16px 0 0;font-size:12px">Aus der Zusammensetzung des Decks abgeleitet: Kurve, Kartentypen,
+      Domains, Tag-Überschneidung mit der Legende und Schlüsselwörter im Kartentext. Keine Metaanalyse.</p>
+  </div>`;
 }
 
 const lineRow = (n, c, label) => `<div class="line"><span class="c">${n}×</span><span class="n">${esc(label ?? c.name)}</span>

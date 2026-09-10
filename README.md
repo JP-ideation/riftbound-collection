@@ -13,7 +13,7 @@ Datenbank – die Sammlung bleibt im Browser des jeweiligen Geräts.
 | Bereich | Funktion |
 | --- | --- |
 | **Sammlung** | Import per Textdatei, Abgleich mit der offiziellen Kartendatenbank, Filter nach Set, Domain, Typ, Seltenheit und Kartentext |
-| **Decks** | Für **jede** Legende im Bestand das stärkste legale Deck: 40 Karten Hauptdeck, 12 Runen, 3 Schlachtfelder, max. 3 Kopien, Domain-Identität der Legende. Mit Energiekurve und Deckwert |
+| **Decks** | Für **jede** Legende im Bestand das stärkste legale Deck: 40 Karten Hauptdeck, 12 Runen, 3 Schlachtfelder, max. 3 Kopien, Domain-Identität der Legende. Mit Energiekurve, Deckwert und Spielhilfe |
 | **Meta-Decks** | Beliebige Deckliste einfügen → Vollständigkeit in Prozent und exakte Liste der fehlenden Karten |
 | **Wunschliste** | Bündelt alles Fehlende; Karten, die in mehreren Decks gebraucht werden, stehen oben |
 | **Teilen** | Sammlung exportieren, Sammlungen von Freunden einfügen und beidseitig abgleichen |
@@ -81,6 +81,7 @@ app.css               Styles
 js/parser.js          Textformat einlesen und schreiben
 js/db.js              Kartendatenbank laden, Sammlung zuordnen
 js/deckbuilder.js     Deckgenerator, Bewertung, Wunschliste
+js/guide.js           Spielhilfe je Deck (aus der Deckzusammensetzung)
 js/app.js             Oberfläche und Zustand
 scripts/fetch-cards.mjs   Kartendaten von Riot holen
 data/cards.json       generiert, wird täglich aktualisiert
@@ -101,12 +102,31 @@ Für jede Legende im Bestand:
    bleibt, wird nach reinem Score aufgefüllt.
 4. **Runen verteilen** – 12 Runen im Verhältnis des tatsächlichen Domain-Bedarfs
    des gebauten Hauptdecks.
-5. **Wunschliste ableiten** – der komplette offizielle Kartenpool der Identität
+5. **Typmischung wahren** – ohne Gegengewicht entstünden Decks aus 38 Einheiten
+   und einem Zauber: 99 % der Einheiten tragen Tags, aber nur 18 % der Zauber,
+   der Synergiebonus bevorzugt Einheiten also strukturell. Als Bezugsgröße
+   dient das Verhältnis, in dem das Spiel die Typen druckt (rund 63/26/11).
+6. **Wunschliste ableiten** – der komplette offizielle Kartenpool der Identität
    wird gegen das gebaute Deck gehalten; was besser wäre als die schwächste
    Karte im Deck, landet als Empfehlung in der Liste.
 
+Kurve und Typmischung werden dabei je zur Hälfte aus einer Ausgangsverteilung
+und dem, was der eigene Pool von sich aus hergibt, gemischt – sonst sähe jedes
+Deck gleich aus.
+
 Die Bewertung ist eine Heuristik, kein Turniersieger-Orakel – sie ersetzt keine
 echte Metaanalyse, findet aber zuverlässig die stärkste Richtung im eigenen Pool.
+
+## Spielhilfe
+
+Jedes Deck bekommt einen Abschnitt „So spielst du das Deck": Archetyp aus der
+Kurve, Spielplan, Schlüsselkarten, Mulligan-Empfehlung, Stärken und Schwächen,
+dazu der Fähigkeitstext der Legende und die eigenen Schlachtfelder.
+
+Alle Aussagen sind aus der Deckzusammensetzung abgeleitet und nennen die Zahl,
+auf der sie beruhen („Nur 4 Karten gegen gegnerische Einheiten"). Es steckt
+bewusst kein Regel- oder Metawissen darin, das sich nicht aus den Kartendaten
+belegen lässt.
 
 ## Grenzen
 

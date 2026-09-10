@@ -12,9 +12,77 @@ export const RULES = { MAIN: 40, RUNES: 12, BATTLEFIELDS: 3, MAX_COPIES: 3 };
 const RARITY_SCORE = { common: 1, uncommon: 2.5, rare: 5, epic: 7, showcase: 5 };
 const MAIN_TYPES = new Set(['unit', 'spell', 'gear']);
 
-/** Zielkurve für 40 Karten – summiert exakt auf 40. */
+/** Ausgangskurve für 40 Karten – summiert exakt auf 40. */
 const CURVE = { 1: 4, 2: 8, 3: 9, 4: 8, 5: 6, 6: 5 };
 const bucket = e => Math.min(6, Math.max(1, e ?? 3));
+
+/**
+ * Zielkurve aus dem Pool ableiten.
+ *
+ * Eine feste Kurve für alle Legenden lässt jedes Deck gleich aussehen. Also
+ * erst schauen, welche Kurve die 40 bestbewerteten Karten von sich aus hätten,
+ * und diese Wunschkurve zur Hälfte mit der Ausgangskurve mischen – so bleibt
+ * die Kurve gesund, unterscheidet sich aber je nach Pool.
+ */
+/**
+ * Zielverteilung der Kartentypen.
+ *
+ * 99 % der Einheiten tragen Tags, aber nur 18 % der Zauber – der Synergiebonus
+ * bevorzugt Einheiten deshalb strukturell, und ohne Gegengewicht entstehen
+ * Decks aus 38 Einheiten und einem Zauber. Als Bezugsgröße dient das
+ * Verhältnis, in dem das Spiel die Typen druckt (rund 63/26/11), zur Hälfte
+ * gemischt mit dem, was der eigene Pool von sich aus hergeben würde.
+ */
+function targetTypes(scored, allCards) {
+  const printed = { unit: 0, spell: 0, gear: 0 };
+  for (const c of canonical(allCards)) {
+    if (c.rarity !== 'showcase' && printed[c.type] !== undefined) printed[c.type]++;
+  }
+  const printedTotal = printed.unit + printed.spell + printed.gear || 1;
+
+  const wish = { unit: 0, spell: 0, gear: 0 };
+  let n = 0;
+  for (const e of scored) {
+    if (n >= RULES.MAIN) break;
+    const take = Math.min(RULES.MAX_COPIES, e.qty, RULES.MAIN - n);
+    if (wish[e.card.type] !== undefined) wish[e.card.type] += take;
+    n += take;
+  }
+  const wishTotal = wish.unit + wish.spell + wish.gear || 1;
+
+  const out = {};
+  for (const t of ['unit', 'spell', 'gear']) {
+    out[t] = Math.round(((printed[t] / printedTotal) + (wish[t] / wishTotal)) / 2 * RULES.MAIN);
+  }
+  return balance(out, ['unit', 'spell', 'gear']);
+}
+
+/** Rundungsdifferenz ausgleichen, damit die Eimer exakt auf 40 summieren. */
+function balance(out, keys) {
+  let diff = RULES.MAIN - keys.reduce((a, k) => a + out[k], 0);
+  while (diff !== 0) {
+    const k = keys.slice().sort((x, y) => out[y] - out[x])[0];
+    out[k] += diff > 0 ? 1 : -1;
+    diff += diff > 0 ? -1 : 1;
+  }
+  return out;
+}
+
+function targetCurve(scored) {
+  const wish = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
+  let n = 0;
+  for (const e of scored) {
+    if (n >= RULES.MAIN) break;
+    const take = Math.min(RULES.MAX_COPIES, e.qty, RULES.MAIN - n);
+    wish[bucket(e.card.energy)] += take;
+    n += take;
+  }
+
+  const out = {};
+  for (const b of [1, 2, 3, 4, 5, 6]) out[b] = Math.round((wish[b] + CURVE[b]) / 2);
+
+  return balance(out, ['1', '2', '3', '4', '5', '6']);
+}
 
 /** Textschlüsselwörter, die in fast jedem Deck Wert haben. */
 const KEYWORDS = [
@@ -34,7 +102,27 @@ function inIdentity(card, identity) {
  * Seltenheit als Grundwert, plus Synergie (Tags der Legende und im Pool
  * häufige Stämme), plus Statwert und Textschlüsselwörter.
  */
-function scoreCard(card, legend, tagWeight) {
+/**
+ * Durchschnittliche Might je Energiekosten – Bezugsgröße für den Statwert.
+ * Ohne sie bekämen Einheiten allein dafür Punkte, dass sie Might haben, und
+ * Zauber und Ausrüstung könnten strukturell nie mithalten.
+ */
+const mightCache = new WeakMap();
+function mightBaseline(allCards) {
+  let hit = mightCache.get(allCards);
+  if (hit) return hit;
+  const sum = new Map(), n = new Map();
+  for (const c of allCards) {
+    if (c.type !== 'unit' || c.might == null || c.energy == null) continue;
+    sum.set(c.energy, (sum.get(c.energy) ?? 0) + c.might);
+    n.set(c.energy, (n.get(c.energy) ?? 0) + 1);
+  }
+  hit = new Map([...sum].map(([e, v]) => [e, v / n.get(e)]));
+  mightCache.set(allCards, hit);
+  return hit;
+}
+
+function scoreCard(card, legend, tagWeight, baseline) {
   let s = RARITY_SCORE[card.rarity] ?? 1;
 
   const legendTags = new Set(legend.tags ?? []);
@@ -43,8 +131,11 @@ function scoreCard(card, legend, tagWeight) {
     else s += (tagWeight.get(t) ?? 0) * 4;       // gut vertretener Stamm
   }
 
+  // Statwert relativ zum Durchschnitt derselben Kosten, damit er um 0 pendelt
+  // statt Einheiten pauschal zu bevorzugen.
   if (card.type === 'unit' && card.might != null && card.energy != null) {
-    s += Math.max(-2, Math.min(4, card.might * 1.2 - card.energy));
+    const avg = baseline?.get(card.energy);
+    if (avg != null) s += Math.max(-3, Math.min(3, (card.might - avg) * 1.5));
   }
   if (card.type === 'gear') s -= 0.5;            // Gear ist meist Support, nicht Kern
 
@@ -101,23 +192,29 @@ export function buildDeck(inventory, legendEntry, allCards) {
   const pool = owned.filter(o => MAIN_TYPES.has(o.card.type) && inIdentity(o.card, identity));
   const weights = tagWeights(pool);
 
+  const baseline = mightBaseline(allCards);
   const scored = pool
-    .map(o => ({ ...o, score: scoreCard(o.card, legend, weights) }))
+    .map(o => ({ ...o, score: scoreCard(o.card, legend, weights, baseline) }))
     .sort((a, b) => b.score - a.score || (a.card.energy ?? 0) - (b.card.energy ?? 0));
 
   // --- Hauptdeck: kurvenbewusst greedy, danach Restauffüllung ---
   const main = [];
   const used = new Map();
-  const buckets = { ...CURVE };
+  const buckets = targetCurve(scored);
+  const typeSlots = targetTypes(scored, allCards);
   let total = 0;
 
-  const take = (entry, respectCurve) => {
+  const take = (entry, respectQuota) => {
     const b = bucket(entry.card.energy);
-    const room = respectCurve ? Math.max(0, buckets[b]) : Infinity;
+    const t = entry.card.type;
+    const room = respectQuota
+      ? Math.min(Math.max(0, buckets[b]), Math.max(0, typeSlots[t] ?? 0))
+      : Infinity;
     const n = Math.min(RULES.MAX_COPIES - (used.get(entry.card.name) ?? 0), entry.qty, RULES.MAIN - total, room);
     if (n <= 0) return;
     used.set(entry.card.name, (used.get(entry.card.name) ?? 0) + n);
     buckets[b] -= n;
+    if (typeSlots[t] !== undefined) typeSlots[t] -= n;
     total += n;
     const hit = main.find(m => m.card.name === entry.card.name);
     if (hit) hit.count += n;
@@ -181,7 +278,7 @@ export function buildDeck(inventory, legendEntry, allCards) {
     complete,
     score: Math.round(deckScore * 10) / 10,
     avgEnergy: Math.round((main.reduce((s, m) => s + (m.card.energy ?? 0) * m.count, 0) / Math.max(total, 1)) * 100) / 100,
-    upgrades: findUpgrades(allCards, inventory, legend, identity, weights, main),
+    upgrades: findUpgrades(allCards, inventory, legend, identity, weights, main, baseline),
   };
 }
 
@@ -190,7 +287,7 @@ export function buildDeck(inventory, legendEntry, allCards) {
  * Vergleicht den gesamten offiziellen Kartenpool der Identität mit dem,
  * was im Deck steckt – das ist die Wunschliste.
  */
-function findUpgrades(allCards, inventory, legend, identity, weights, main) {
+function findUpgrades(allCards, inventory, legend, identity, weights, main, baseline) {
   const inDeck = new Map(main.map(m => [m.card.name, m.count]));
   const weakest = main.length ? Math.min(...main.map(m => m.score)) : 0;
 
@@ -199,7 +296,7 @@ function findUpgrades(allCards, inventory, legend, identity, weights, main) {
     .map(c => {
       const ownedQty = inventory.owned.get(c.name)?.qty ?? 0;
       const missing = RULES.MAX_COPIES - Math.max(ownedQty, inDeck.get(c.name) ?? 0);
-      return { card: c, score: scoreCard(c, legend, weights), ownedQty, missing };
+      return { card: c, score: scoreCard(c, legend, weights, baseline), ownedQty, missing };
     })
     .filter(u => u.missing > 0 && u.score > weakest)
     .sort((a, b) => b.score - a.score)
@@ -222,7 +319,9 @@ function canonical(allCards) {
   const best = new Map();
   for (const c of allCards) {
     const cur = best.get(c.name);
-    if (!cur || printRank(c) > printRank(cur)) best.set(c.name, c);
+    const nimm = !cur || printRank(c) > printRank(cur)
+      || (printRank(c) === printRank(cur) && (c.text?.length ?? 0) > (cur.text?.length ?? 0));
+    if (nimm) best.set(c.name, c);
   }
   hit = [...best.values()];
   canonCache.set(allCards, hit);
