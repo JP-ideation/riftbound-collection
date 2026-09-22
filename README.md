@@ -55,6 +55,18 @@ Varianten-Suffixe (`#240a`), Extended-Art-Sets (`OGNX`/`UNLX`/`VENX`),
 Foil-Markierung `*F*` und doppelte Zeilen (werden addiert). Kommentarzeilen
 beginnen mit `//`.
 
+### Kartenidentität
+
+Riot führt seit September 2026 den Beinamen in einem eigenen Feld: `name` ist
+nur noch `"Kennen"`, der Beiname steht in `subtitle`. **Der Name allein ist
+damit kein Identitätsschlüssel mehr** – unter `"Kennen"` liegen zwei völlig
+verschiedene Spielkarten (VEN-135 Order/2 Might und VEN-113 Chaos/4 Might).
+Über alle 1189 Drucke sind 48 Namen mehrdeutig.
+
+Bestand, Deckbau, Meta-Abgleich und Wunschliste schlüsseln deshalb über
+`fullName` (`name, subtitle`). Das ist nachweislich eindeutig: 936 Werte,
+keiner mit abweichenden Spielwerten.
+
 Jede Kartenzeile in der App zeigt **Domain, Set-Kennung und Energiekosten**
 (`Order · VEN-135 · 3E`). Das ist wichtig: Derselbe Champion existiert in
 mehreren Domains mit völlig unterschiedlichen Effekten – *Kennen, Keeper of

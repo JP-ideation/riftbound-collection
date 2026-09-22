@@ -18,12 +18,25 @@ export async function loadCards() {
     const token = codeToken(c);
     prefer(bySetNum, `${c.set}-${keepSuffix(token)}`, c);   // exakt, z. B. 197A
     prefer(bySetNum, `${c.set}-${normNum(token)}`, c);      // Basis,  z. B. 197
-    prefer(byName, c.name.toLowerCase(), c);
+    prefer(byName, key(c), c);
   }
 
   DB = { ...raw, bySetNum, byName };
   return DB;
 }
+
+/**
+ * Identitaetsschluessel einer Spielkarte.
+ *
+ * NICHT der blosse Name: Riot fuehrt den Beinamen seit 09/2026 getrennt, und
+ * unter "Kennen" liegen zwei voellig verschiedene Karten (VEN-135 Order/2 Might
+ * und VEN-113 Chaos/4 Might). Ueber alle 1189 Drucke ist name+subtitle
+ * eindeutig: 936 Werte, keiner mit abweichenden Spielwerten.
+ */
+export const key = c => (c.fullName ?? c.name).toLowerCase();
+
+/** Eingabenamen vereinheitlichen: "Kennen - Keeper of Balance" wie "Kennen, Keeper of Balance". */
+const normName = n => String(n ?? '').toLowerCase().replace(/\s+-\s+/, ', ').replace(/\s+/g, ' ').trim();
 
 /** publicCode -> Nummern-Token: "UNL-131/219" ergibt 131, "VEN-R04" ergibt R04. */
 function codeToken(card) {
@@ -69,20 +82,46 @@ function normNum(n) {
 }
 
 /** Einen Sammlungseintrag der offiziellen Karte zuordnen. */
+/**
+ * Passt der Name der gefundenen Karte zum Namen in der Eingabe?
+ *
+ * Plausibilitaetspruefung: Schreibt eine Scanner-App versehentlich die
+ * collectorNumber statt des publicCode, zeigt die Nummer auf eine fremde
+ * Karte ("Calm Rune (VEN) #002" -> Blade Twirler). Ohne diese Pruefung wuerde
+ * die stillschweigend eingebucht.
+ */
+function nameFits(card, entry) {
+  const a = normName(entry.name);
+  const b = key(card);
+  if (a === b) return true;
+  const teile = a.split(', ');
+  // Export stellt bei Legenden den Champion voran: "Kennen - Heart of the Tempest"
+  if (teile.length === 2 && (teile[1] === b || teile[0] === b)) return true;
+  // Export ohne Beinamen: "Kennen" fuer "Kennen, Keeper of Balance"
+  if (b.split(', ')[0] === a) return true;
+  return false;
+}
+
 export function resolve(db, entry) {
   if (entry.num) {
     const hit = db.bySetNum.get(`${entry.set}-${keepSuffix(entry.num)}`)
              ?? db.bySetNum.get(`${entry.set}-${normNum(entry.num)}`);
-    if (hit) return hit;
+    if (hit && nameFits(hit, entry)) return hit;
+    // Nummer und Name widersprechen sich: dem Namen glauben, er ist
+    // eindeutig. Nur wenn der Name unbekannt ist, zaehlt die Nummer.
+    if (hit) {
+      const perName = db.byName.get(normName(entry.name));
+      return perName ?? hit;
+    }
   }
-  const direct = db.byName.get(entry.name.toLowerCase());
+  // Exporte schreiben "Kennen - Keeper of Balance", die DB fuehrt
+  // "Kennen, Keeper of Balance" - beides auf eine Form bringen.
+  const direct = db.byName.get(normName(entry.name));
   if (direct) return direct;
-  // Exporte schreiben Legenden/Champions als "Kha'Zix - Voidreaver",
-  // die offizielle DB kennt nur "Voidreaver".
+  // Legenden heissen in der DB nur nach ihrem Beinamen ("Heart of the
+  // Tempest"), Exporte stellen den Champion voran.
   const dash = entry.name.split(/\s+-\s+/);
-  if (dash.length === 2) {
-    return db.byName.get(dash[1].toLowerCase()) ?? db.byName.get(dash[0].toLowerCase()) ?? null;
-  }
+  if (dash.length === 2) return db.byName.get(normName(dash[1])) ?? null;
   return null;
 }
 
@@ -98,11 +137,14 @@ export function buildInventory(db, entries) {
   for (const e of entries) {
     const found = resolve(db, e);
     if (!found) { unmatched.push(e); continue; }
-    // Immer die reguläre Ausgabe als Referenz führen, nie den Showcase-Druck.
-    const card = db.byName.get(found.name.toLowerCase()) ?? found;
-    const hit = owned.get(card.name);
+    // Die regulaere Ausgabe derselben Karte als Referenz fuehren, nie den
+    // Showcase-Druck. Nachschlagen ueber den Identitaetsschluessel - ueber den
+    // blossen Namen wuerde hier eine fremde Karte eingesetzt.
+    const card = db.byName.get(key(found)) ?? found;
+    const k = key(card);
+    const hit = owned.get(k);
     if (hit) { hit.qty += e.qty; hit.printings.push(e); }
-    else owned.set(card.name, { card, qty: e.qty, printings: [e] });
+    else owned.set(k, { card, qty: e.qty, printings: [e] });
   }
 
   return { owned, unmatched };

@@ -70,7 +70,7 @@ function archetype(deck, s) {
 /* ------------------------------------------------------------ Spielplan */
 function plan(deck, s) {
   const out = [];
-  const ziel = deck.champion ?? deck.legend.name;
+  const ziel = deck.champion ?? deck.legend.fullName ?? deck.legend.name;
 
   out.push(`Punkte kommen über Schlachtfelder – erobern und halten. Alles hier zielt darauf, dort länger Einheiten stehen zu haben als der Gegner.`);
 

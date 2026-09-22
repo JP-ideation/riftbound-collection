@@ -53,7 +53,13 @@ function normalize(c) {
   const types = (c.cardType?.type ?? []).map(t => t.id);
   return {
     id: c.id,
+    // Riot fuehrt seit 09/2026 den Beinamen getrennt: name="Kennen",
+    // subtitle="Keeper of Balance". Ohne den Beinamen sind zwei voellig
+    // verschiedene Spielkarten namensgleich - "Kennen" gibt es in Order
+    // (VEN-135, 2 Might) und in Chaos (VEN-113, 4 Might).
     name: c.name,
+    subtitle: c.subtitle ?? '',
+    fullName: c.subtitle ? `${c.name}, ${c.subtitle}` : c.name,
     set: c.set?.value?.id ?? '?',
     setName: c.set?.value?.label ?? '',
     num: c.collectorNumber ?? null,

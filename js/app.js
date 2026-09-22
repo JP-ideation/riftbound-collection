@@ -1,5 +1,5 @@
 import { parseCollection, serializeCollection } from './parser.js';
-import { loadCards, buildInventory, resolve } from './db.js';
+import { loadCards, buildInventory, resolve, key } from './db.js';
 import { suggestDecks, deckToText, deckTitle, RULES } from './deckbuilder.js';
 import { buildGuide } from './guide.js';
 
@@ -16,6 +16,9 @@ const state = {
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const img = (c, w = 320) => c.img ? esc(c.img + '&w=' + w) : '';
+// Anzeigename ist IMMER Name + Beiname. "Kennen" allein bezeichnet zwei
+// verschiedene Spielkarten und ist als Beschriftung unbrauchbar.
+const cname = c => c.fullName ?? c.name;
 const dots = ds => (ds ?? []).map(d => `<span class="dom ${d}" title="${d}"></span>`).join('');
 
 // Domain als lesbares Wort, nicht nur als Farbpunkt: zwei Karten desselben
@@ -106,7 +109,7 @@ function viewSammlung() {
   const owned = [...state.inv.owned.values()];
   const hit = owned.filter(o => {
     const c = o.card;
-    return (!f.q || c.name.toLowerCase().includes(f.q.toLowerCase()) || (c.text ?? '').toLowerCase().includes(f.q.toLowerCase()))
+    return (!f.q || cname(c).toLowerCase().includes(f.q.toLowerCase()) || (c.text ?? '').toLowerCase().includes(f.q.toLowerCase()))
       && (!f.set || c.set === f.set) && (!f.domain || (c.domains ?? []).includes(f.domain))
       && (!f.type || c.type === f.type) && (!f.rarity || c.rarity === f.rarity);
   }).sort((a, b) => a.card.set.localeCompare(b.card.set) || (a.card.num ?? 0) - (b.card.num ?? 0));
@@ -143,9 +146,9 @@ const sel = (id, label, opts, val) =>
 
 function tile(c, qty, missing = false) {
   return `<div class="tile ${missing ? 'miss' : ''}" data-card="${esc(c.id)}">
-    <img loading="lazy" src="${img(c)}" alt="${esc(c.name)}">
+    <img loading="lazy" src="${img(c)}" alt="${esc(cname(c))}">
     <span class="qty">${missing ? '−' : ''}${qty}</span>
-    <div class="nm">${dots(c.domains)} ${esc(c.name)}</div></div>`;
+    <div class="nm">${dots(c.domains)} ${esc(cname(c))}</div></div>`;
 }
 
 /* --- Decks --- */
@@ -203,7 +206,7 @@ function viewDeckDetail(d) {
           <h3 class="wishhead">Diese Karten besitzt du NICHT</h3>
           <p class="sub" style="margin:0 0 10px">Sie stecken nicht im Deck oben – sie würden es verbessern, wenn du sie dir zulegst.</p>
           <div class="lines">${d.upgrades.slice(0, 12).map(u =>
-            `<div class="line missing"><span class="c">fehlt ${u.missing}×</span><span class="n">${esc(u.card.name)}</span>
+            `<div class="line missing"><span class="c">fehlt ${u.missing}×</span><span class="n">${esc(cname(u.card))}</span>
              <span class="e">${ident(u.card)}${u.ownedQty ? ` · du hast ${u.ownedQty}` : ' · du hast 0'}</span></div>`).join('')
             || '<div class="line">Nichts Offensichtliches – dein Pool ist für diese Legende ausgereizt.</div>'}</div>
         </div>
@@ -217,8 +220,8 @@ function viewDeckDetail(d) {
 /* --- Spielhilfe --- */
 function guideBlock(d) {
   const g = buildGuide(d);
-  const mini = (c, n) => `<div class="minicard"><img loading="lazy" src="${img(c, 220)}" alt="${esc(c.name)}">
-    <span class="qty">${n}</span><div class="nm">${esc(c.name)}</div></div>`;
+  const mini = (c, n) => `<div class="minicard"><img loading="lazy" src="${img(c, 220)}" alt="${esc(cname(c))}">
+    <span class="qty">${n}</span><div class="nm">${esc(cname(c))}</div></div>`;
   const list = (items, cls) => items.length
     ? `<ul class="${cls}">${items.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : '';
 
@@ -250,14 +253,14 @@ function guideBlock(d) {
 
     <h4>Deine Schlachtfelder</h4>
     <div class="lines">${d.battlefields.map(b => `<div class="line" style="display:block">
-      <b>${esc(b.card.name)}</b><br><span class="e">${esc(b.card.text || '–')}</span></div>`).join('')}</div>
+      <b>${esc(cname(b.card))}</b><br><span class="e">${esc(b.card.text || '–')}</span></div>`).join('')}</div>
 
     <p class="sub" style="margin:16px 0 0;font-size:12px">Aus der Zusammensetzung des Decks abgeleitet: Kurve, Kartentypen,
       Domains, Tag-Überschneidung mit der Legende und Schlüsselwörter im Kartentext. Keine Metaanalyse.</p>
   </div>`;
 }
 
-const lineRow = (n, c, label) => `<div class="line"><span class="c">${n}×</span><span class="n">${esc(label ?? c.name)}</span>
+const lineRow = (n, c, label) => `<div class="line"><span class="c">${n}×</span><span class="n">${esc(label ?? cname(c))}</span>
   <span class="e">${ident(c)}</span></div>`;
 
 /* --- Meta-Decks --- */
@@ -265,8 +268,8 @@ function analyzeDeck(text) {
   const { entries } = parseCollection(text);
   const rows = entries.map(e => {
     const found = resolve(state.db, e);
-    const card = found ? (state.db.byName.get(found.name.toLowerCase()) ?? found) : null;
-    const have = card ? (state.inv.owned.get(card.name)?.qty ?? 0) : 0;
+    const card = found ? (state.db.byName.get(key(found)) ?? found) : null;
+    const have = card ? (state.inv.owned.get(key(card))?.qty ?? 0) : 0;
     return { need: e.qty, have: Math.min(have, e.qty), card, raw: e, missing: Math.max(0, e.qty - have) };
   });
   const need = rows.reduce((s, r) => s + r.need, 0);
@@ -302,7 +305,7 @@ function viewMeta() {
         <div class="bar-track"><div class="bar-fill ${cls === 'ok' ? '' : cls}" style="width:${d.a.pct}%"></div></div>
         ${miss.length ? `<h3>Dir fehlen ${d.a.missing} Karten</h3>
           <div class="lines">${miss.map(r => `<div class="line missing"><span class="c">fehlt ${r.missing}×</span>
-            <span class="n">${esc(r.card?.name ?? r.raw.rawName)}</span>
+            <span class="n">${esc(r.card ? cname(r.card) : r.raw.rawName)}</span>
             <span class="e">${r.card ? ident(r.card) : 'unbekannte Karte'}</span></div>`).join('')}</div>`
           : '<div class="notice" style="margin-top:12px">Dieses Deck kannst du komplett bauen.</div>'}
       </div>`;
@@ -314,8 +317,8 @@ function viewWunsch() {
   const want = new Map();
   const add = (card, n, why) => {
     if (!card) return;
-    const h = want.get(card.name) ?? { card, n: 0, why: new Set() };
-    h.n = Math.max(h.n, n); h.why.add(why); want.set(card.name, h);
+    const h = want.get(key(card)) ?? { card, n: 0, why: new Set() };
+    h.n = Math.max(h.n, n); h.why.add(why); want.set(key(card), h);
   };
 
   for (const d of read(KEY.meta, [])) {
@@ -335,7 +338,7 @@ function viewWunsch() {
     <div class="grid-stats">${kpi(list.length, 'verschiedene Karten')}${kpi(totalCards, 'Exemplare')}
       ${kpi(list.filter(x => x.why.size > 1).length, 'mehrfach gebraucht')}</div>
     ${list.length ? `<div class="lines">${list.map(x => `<div class="line missing">
-        <span class="c">fehlt ${x.n}×</span><span class="n">${esc(x.card.name)}
+        <span class="c">fehlt ${x.n}×</span><span class="n">${esc(cname(x.card))}
         <span class="tag" style="margin-left:6px">${[...x.why].slice(0, 3).map(esc).join(', ')}${x.why.size > 3 ? ' +' + (x.why.size - 3) : ''}</span></span>
         <span class="e">${ident(x.card)}</span></div>`).join('')}</div>
       <div class="row" style="margin-top:14px"><button class="btn" id="copyWish">Als Liste kopieren</button></div>`
@@ -367,8 +370,8 @@ function viewTeilen() {
     ${friends.map(fr => {
       const { entries } = parseCollection(fr.text);
       const other = buildInventory(state.db, entries).owned;
-      const theyHave = [...other.values()].filter(o => !state.inv.owned.has(o.card.name));
-      const youHave = [...state.inv.owned.values()].filter(o => !other.has(o.card.name));
+      const theyHave = [...other.values()].filter(o => !state.inv.owned.has(key(o.card)));
+      const youHave = [...state.inv.owned.values()].filter(o => !other.has(key(o.card)));
       return `<div class="card" style="margin-top:16px">
         <div class="row" style="justify-content:space-between">
           <b>${esc(fr.name)}</b>

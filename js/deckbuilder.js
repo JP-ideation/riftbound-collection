@@ -7,6 +7,9 @@
  *   Karten müssen in der Domain-Identität der Legende liegen (+ farblos).
  */
 
+/** Identitaetsschluessel: Name + Beiname, siehe db.js. */
+export const key = c => (c.fullName ?? c.name).toLowerCase();
+
 export const RULES = { MAIN: 40, RUNES: 12, BATTLEFIELDS: 3, MAX_COPIES: 3 };
 
 const RARITY_SCORE = { common: 1, uncommon: 2.5, rare: 5, epic: 7, showcase: 5 };
@@ -159,7 +162,7 @@ function championNames(allCards) {
   let hit = champCache.get(allCards);
   if (hit) return hit;
   hit = new Set();
-  for (const c of allCards) if (c.type === 'unit' && c.name.includes(', ')) hit.add(c.name.split(', ')[0]);
+  for (const c of allCards) if (c.type === 'unit' && c.subtitle) hit.add(c.name);
   champCache.set(allCards, hit);
   return hit;
 }
@@ -210,13 +213,13 @@ export function buildDeck(inventory, legendEntry, allCards) {
     const room = respectQuota
       ? Math.min(Math.max(0, buckets[b]), Math.max(0, typeSlots[t] ?? 0))
       : Infinity;
-    const n = Math.min(RULES.MAX_COPIES - (used.get(entry.card.name) ?? 0), entry.qty, RULES.MAIN - total, room);
+    const n = Math.min(RULES.MAX_COPIES - (used.get(key(entry.card)) ?? 0), entry.qty, RULES.MAIN - total, room);
     if (n <= 0) return;
-    used.set(entry.card.name, (used.get(entry.card.name) ?? 0) + n);
+    used.set(key(entry.card), (used.get(key(entry.card)) ?? 0) + n);
     buckets[b] -= n;
     if (typeSlots[t] !== undefined) typeSlots[t] -= n;
     total += n;
-    const hit = main.find(m => m.card.name === entry.card.name);
+    const hit = main.find(m => key(m.card) === key(entry.card));
     if (hit) hit.count += n;
     else main.push({ card: entry.card, count: n, score: entry.score });
   };
@@ -246,7 +249,7 @@ export function buildDeck(inventory, legendEntry, allCards) {
   }
   for (const r of runePool) {                       // Rest auffüllen
     if (runeCount >= RULES.RUNES) break;
-    const hit = runes.find(x => x.card.name === r.card.name);
+    const hit = runes.find(x => key(x.card) === key(r.card));
     const n = Math.min(r.qty - (hit?.count ?? 0), RULES.RUNES - runeCount);
     if (n <= 0) continue;
     if (hit) hit.count += n; else runes.push({ card: r.card, count: n });
@@ -288,14 +291,14 @@ export function buildDeck(inventory, legendEntry, allCards) {
  * was im Deck steckt – das ist die Wunschliste.
  */
 function findUpgrades(allCards, inventory, legend, identity, weights, main, baseline) {
-  const inDeck = new Map(main.map(m => [m.card.name, m.count]));
+  const inDeck = new Map(main.map(m => [key(m.card), m.count]));
   const weakest = main.length ? Math.min(...main.map(m => m.score)) : 0;
 
   return canonical(allCards)
     .filter(c => MAIN_TYPES.has(c.type) && inIdentity(c, identity) && c.rarity !== 'showcase')
     .map(c => {
-      const ownedQty = inventory.owned.get(c.name)?.qty ?? 0;
-      const missing = RULES.MAX_COPIES - Math.max(ownedQty, inDeck.get(c.name) ?? 0);
+      const ownedQty = inventory.owned.get(key(c))?.qty ?? 0;
+      const missing = RULES.MAX_COPIES - Math.max(ownedQty, inDeck.get(key(c)) ?? 0);
       return { card: c, score: scoreCard(c, legend, weights, baseline), ownedQty, missing };
     })
     .filter(u => u.missing > 0 && u.score > weakest)
@@ -318,10 +321,10 @@ function canonical(allCards) {
   if (hit) return hit;
   const best = new Map();
   for (const c of allCards) {
-    const cur = best.get(c.name);
+    const cur = best.get(key(c));
     const nimm = !cur || printRank(c) > printRank(cur)
       || (printRank(c) === printRank(cur) && (c.text?.length ?? 0) > (cur.text?.length ?? 0));
-    if (nimm) best.set(c.name, c);
+    if (nimm) best.set(key(c), c);
   }
   hit = [...best.values()];
   canonCache.set(allCards, hit);
@@ -347,7 +350,7 @@ export function deckToText(deck) {
     const tok = m ? m[1].replace(/\*/g, '') : String(c.num ?? '');
     return /^\d+$/.test(tok) ? tok.padStart(3, '0') : tok;
   };
-  const line = (n, c) => `${n} ${c.name} (${c.set}) #${num(c)}`;
+  const line = (n, c) => `${n} ${c.fullName ?? c.name} (${c.set}) #${num(c)}`;
   const sec = (title, list) => list.length ? `\n// ${title}\n` + list.map(x => line(x.count, x.card)).join('\n') : '';
   return `// ${deckTitle(deck)}\n// Legende\n${line(1, deck.legend)}`
     + sec('Hauptdeck', deck.main) + sec('Runen', deck.runes) + sec('Schlachtfelder', deck.battlefields) + '\n';
