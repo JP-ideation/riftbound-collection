@@ -17,6 +17,18 @@ const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const img = (c, w = 320) => c.img ? esc(c.img + '&w=' + w) : '';
 const dots = ds => (ds ?? []).map(d => `<span class="dom ${d}" title="${d}"></span>`).join('');
+
+// Domain als lesbares Wort, nicht nur als Farbpunkt: zwei Karten desselben
+// Champions koennen in verschiedenen Domains liegen und voellig
+// unterschiedliche Effekte haben. Ein winziger Punkt reicht dafuer nicht.
+const DOM_LABEL = { calm: 'Calm', mind: 'Mind', body: 'Body', fury: 'Fury',
+                    order: 'Order', chaos: 'Chaos', colorless: 'farblos' };
+const domLabel = ds => (ds ?? []).map(d => DOM_LABEL[d] ?? d).join(' + ') || '–';
+// "VEN-135/166" -> "VEN-135" : eindeutige Kennung zum Nachschlagen
+const shortCode = c => (c.code ?? '').split('/')[0] || `${c.set}-${c.num}`;
+// Domain + Kennung + Kosten, die vollstaendige Identitaet einer Karte
+const ident = c => `${dots(c.domains)} ${esc(domLabel(c.domains))} · ${esc(shortCode(c))}`
+  + (c.energy != null ? ` · ${c.energy}E` : '');
 const pct = (a, b) => Math.round((a / Math.max(b, 1)) * 100);
 
 function store(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
@@ -187,11 +199,14 @@ function viewDeckDetail(d) {
         <div class="lines">${d.runes.map(m => lineRow(m.count, m.card)).join('')}</div>
         <h3>Schlachtfelder · ${d.counts.battlefields}/3</h3>
         <div class="lines">${d.battlefields.map(m => lineRow(1, m.card)).join('')}</div>
-        <h3>Diese Karten würden das Deck am meisten verbessern</h3>
-        <div class="lines">${d.upgrades.slice(0, 12).map(u =>
-          `<div class="line missing"><span class="c">+${u.missing}</span><span class="n">${esc(u.card.name)}</span>
-           <span class="e">${dots(u.card.domains)} ${u.card.code} · ${u.card.rarity}${u.ownedQty ? ` · hast ${u.ownedQty}` : ''}</span></div>`).join('')
-          || '<div class="line">Nichts Offensichtliches – dein Pool ist für diese Legende ausgereizt.</div>'}</div>
+        <div class="wishbox">
+          <h3 class="wishhead">Diese Karten besitzt du NICHT</h3>
+          <p class="sub" style="margin:0 0 10px">Sie stecken nicht im Deck oben – sie würden es verbessern, wenn du sie dir zulegst.</p>
+          <div class="lines">${d.upgrades.slice(0, 12).map(u =>
+            `<div class="line missing"><span class="c">fehlt ${u.missing}×</span><span class="n">${esc(u.card.name)}</span>
+             <span class="e">${ident(u.card)}${u.ownedQty ? ` · du hast ${u.ownedQty}` : ' · du hast 0'}</span></div>`).join('')
+            || '<div class="line">Nichts Offensichtliches – dein Pool ist für diese Legende ausgereizt.</div>'}</div>
+        </div>
         <div class="row" style="margin-top:14px">
           <button class="btn" id="copyDeck">Deckliste kopieren</button>
         </div>
@@ -243,7 +258,7 @@ function guideBlock(d) {
 }
 
 const lineRow = (n, c, label) => `<div class="line"><span class="c">${n}×</span><span class="n">${esc(label ?? c.name)}</span>
-  <span class="e">${dots(c.domains)}${c.energy != null ? ' ' + c.energy + 'E' : ''} · ${c.rarity}</span></div>`;
+  <span class="e">${ident(c)}</span></div>`;
 
 /* --- Meta-Decks --- */
 function analyzeDeck(text) {
@@ -286,9 +301,9 @@ function viewMeta() {
         </div>
         <div class="bar-track"><div class="bar-fill ${cls === 'ok' ? '' : cls}" style="width:${d.a.pct}%"></div></div>
         ${miss.length ? `<h3>Dir fehlen ${d.a.missing} Karten</h3>
-          <div class="lines">${miss.map(r => `<div class="line missing"><span class="c">${r.missing}×</span>
+          <div class="lines">${miss.map(r => `<div class="line missing"><span class="c">fehlt ${r.missing}×</span>
             <span class="n">${esc(r.card?.name ?? r.raw.rawName)}</span>
-            <span class="e">${r.card ? dots(r.card.domains) + ' ' + r.card.code + ' · ' + r.card.rarity : 'unbekannte Karte'}</span></div>`).join('')}</div>`
+            <span class="e">${r.card ? ident(r.card) : 'unbekannte Karte'}</span></div>`).join('')}</div>`
           : '<div class="notice" style="margin-top:12px">Dieses Deck kannst du komplett bauen.</div>'}
       </div>`;
     }).join('') : '<div class="empty">Noch keine Meta-Decks gespeichert.</div>'}`;
@@ -320,9 +335,9 @@ function viewWunsch() {
     <div class="grid-stats">${kpi(list.length, 'verschiedene Karten')}${kpi(totalCards, 'Exemplare')}
       ${kpi(list.filter(x => x.why.size > 1).length, 'mehrfach gebraucht')}</div>
     ${list.length ? `<div class="lines">${list.map(x => `<div class="line missing">
-        <span class="c">${x.n}×</span><span class="n">${esc(x.card.name)}
+        <span class="c">fehlt ${x.n}×</span><span class="n">${esc(x.card.name)}
         <span class="tag" style="margin-left:6px">${[...x.why].slice(0, 3).map(esc).join(', ')}${x.why.size > 3 ? ' +' + (x.why.size - 3) : ''}</span></span>
-        <span class="e">${dots(x.card.domains)} ${x.card.code} · ${x.card.rarity}</span></div>`).join('')}</div>
+        <span class="e">${ident(x.card)}</span></div>`).join('')}</div>
       <div class="row" style="margin-top:14px"><button class="btn" id="copyWish">Als Liste kopieren</button></div>`
     : '<div class="empty">Nichts offen. Speicher ein Meta-Deck, um eine Wunschliste zu bekommen.</div>'}`;
 }

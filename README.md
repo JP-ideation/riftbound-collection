@@ -55,6 +55,12 @@ Varianten-Suffixe (`#240a`), Extended-Art-Sets (`OGNX`/`UNLX`/`VENX`),
 Foil-Markierung `*F*` und doppelte Zeilen (werden addiert). Kommentarzeilen
 beginnen mit `//`.
 
+Jede Kartenzeile in der App zeigt **Domain, Set-Kennung und Energiekosten**
+(`Order · VEN-135 · 3E`). Das ist wichtig: Derselbe Champion existiert in
+mehreren Domains mit völlig unterschiedlichen Effekten – *Kennen, Keeper of
+Balance* (VEN-135, Order) ist eine andere Karte als *Kennen, Storm of Shuriken*
+(VEN-113, Chaos). Ein farbiger Punkt allein reicht zur Unterscheidung nicht.
+
 Karten werden über Set + Sammlernummer zugeordnet, ersatzweise über den Namen.
 Für den Deckbau zählt nur der Kartenname – Foils, Alt-Arts und Nachdrucke aus
 mehreren Sets sind dieselbe Spielkarte.
