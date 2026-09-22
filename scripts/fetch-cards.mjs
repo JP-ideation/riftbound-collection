@@ -4,7 +4,7 @@
  * schlank normalisiert nach data/cards.json.
  * Keine Abhängigkeiten, kein API-Key. Läuft via GitHub Action taeglich.
  */
-import { writeFile, mkdir } from 'node:fs/promises';
+import { writeFile, mkdir, readFile } from 'node:fs/promises';
 
 const HOST = 'https://content.publishing.riotgames.com';
 const START = '/publishing-content/v2.0/public/channel/riftbound_website/list/riftbound_gallery_cards?locale=en_US&from=0&limit=1000';
@@ -87,9 +87,28 @@ const out = {
   source: 'playriftbound.com (offizielle Riot-Kartengalerie)',
   count: cards.length,
   sets: [...new Set(cards.map(c => c.set?.value?.id))].filter(Boolean).sort(),
-  cards: cards.map(normalize).sort((a, b) => a.set.localeCompare(b.set) || (a.num ?? 0) - (b.num ?? 0)),
+  // Eindeutige Gesamtordnung: Set und Sammlernummer allein reichen nicht,
+  // weil Basisdruck und Alt-Art dieselbe Nummer tragen (OGN-007 / OGN-007a).
+  // Ohne den Code als Stichentscheid wechselt die Reihenfolge je nach
+  // Antwortreihenfolge der API - und die Datei aendert sich bei jedem Lauf.
+  cards: cards.map(normalize).sort((a, b) =>
+    a.set.localeCompare(b.set) || (a.num ?? 0) - (b.num ?? 0)
+    || a.code.localeCompare(b.code) || a.id.localeCompare(b.id)),
 };
 
 await mkdir('data', { recursive: true });
+
+// Nur schreiben, wenn sich die Karten wirklich geaendert haben. Der
+// Zeitstempel allein aendert sich bei jedem Lauf - ohne diesen Vergleich
+// entstuende taeglich ein leerer Commit samt ueberfluessigem Deploy.
+const neu = JSON.stringify(out.cards);
+try {
+  const alt = JSON.parse(await readFile('data/cards.json', 'utf8'));
+  if (JSON.stringify(alt.cards) === neu) {
+    console.log(`Keine Aenderung: ${out.count} Karten, Datei bleibt unangetastet.`);
+    process.exit(0);
+  }
+} catch { /* keine bisherige Datei - normal schreiben */ }
+
 await writeFile('data/cards.json', JSON.stringify(out));
 console.log(`${out.count} Karten geschrieben nach data/cards.json (Sets: ${out.sets.join(', ')})`);
