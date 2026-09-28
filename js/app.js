@@ -1,6 +1,6 @@
 import { parseCollection, serializeCollection } from './parser.js';
 import { loadCards, buildInventory, resolve, key } from './db.js';
-import { suggestDecks, deckToText, deckTitle, RULES } from './deckbuilder.js';
+import { suggestDecks, deckToText, deckTitle, checkDeck, championOf, RULES } from './deckbuilder.js';
 import { buildGuide } from './guide.js';
 
 const KEY = { coll: 'rb.collection.v1', meta: 'rb.metadecks.v1', friends: 'rb.friends.v1' };
@@ -51,8 +51,35 @@ function applyCollection(text, persist = true) {
 }
 
 function decks() {
-  if (!state.decks) state.decks = suggestDecks(state.inv, state.db.cards);
+  if (!state.decks) state.decks = suggestDecks(state.inv, state.db.cards, metaDecks());
   return state.decks;
+}
+
+/**
+ * Gespeicherte Meta-Decklisten in eine Form bringen, die der Deckbau nutzen
+ * kann: welche Legende, welche Karten. Listen ohne erkennbare Legende helfen
+ * dem Deckbau nicht, werden im Meta-Tab aber trotzdem ausgewertet.
+ */
+function parseMetaList(text) {
+  const { entries } = parseCollection(text);
+  const rows = entries.map(e => {
+    const found = resolve(state.db, e);
+    return { e, card: found ? (state.db.byName.get(key(found)) ?? found) : null };
+  });
+  const legend = rows.find(r => r.card?.type === 'legend')?.card ?? null;
+  const main = rows.filter(r => r.card && ['unit', 'spell', 'gear'].includes(r.card.type))
+    .map(r => ({ card: r.card, count: r.e.qty }));
+  return { legend, main };
+}
+
+function metaDecks() {
+  // "Nur prüfen" (eigenes Deck) fließt nicht ein – sonst würde ein schwaches
+  // eigenes Deck den Deckbau in seine eigene Richtung ziehen.
+  return read(KEY.meta, []).filter(d => !d.own).map(d => {
+    const { legend, main } = parseMetaList(d.text);
+    if (!legend) return null;
+    return { legendKey: key(legend), champion: championOf(legend, state.db.cards), cards: new Set(main.map(m => key(m.card))) };
+  }).filter(Boolean);
 }
 
 function renderHead() {
@@ -185,14 +212,16 @@ function viewDeckDetail(d) {
     <div class="row" style="margin-bottom:14px"><button class="btn sm" id="backDecks">← Alle Decks</button></div>
     <h2>${esc(deckTitle(d))} <span class="badge ${d.complete ? 'ok' : 'warn'}">${d.complete ? 'komplett spielbar' : 'unvollständig'}</span></h2>
     <p class="sub">${dots(d.identity)} ${d.identity.join(' + ')} · Deckwert ${d.score} · Ø ${d.avgEnergy} Energie
-      ${d.complete ? '' : ` · es fehlen ${d.missingSlots.main} Hauptdeck-, ${d.missingSlots.runes} Runen- und ${d.missingSlots.battlefields} Schlachtfeldkarten`}</p>
+      ${d.complete ? '' : ` · es fehlen ${d.missingSlots.main} Hauptdeck-, ${d.missingSlots.runes} Runen- und ${d.missingSlots.battlefields} Schlachtfeldkarten`}
+      ${d.hasChampion ? '' : ` · <b>keine Champion-Einheit von ${esc(d.champion)} im Bestand</b> (Pflicht)`}
+      ${d.metaDecks ? ` · berücksichtigt ${d.metaDecks} Meta-Deck${d.metaDecks === 1 ? '' : 's'} dieser Legende` : ''}</p>
 
     ${guideBlock(d)}
 
     <div class="cols">
       <div>
         <h3>Hauptdeck · ${d.counts.main}/40</h3>
-        <div class="lines">${d.main.map(m => lineRow(m.count, m.card)).join('')}</div>
+        <div class="lines">${d.main.map(m => lineRow(m.count, m.card, null, (m.why ?? []).filter(w => w.ok === false).map(w => w.text))).join('')}</div>
         <h3>Energiekurve</h3>
         <div class="curve">${curve}</div>
       </div>
@@ -236,6 +265,14 @@ function guideBlock(d) {
     <h4>Schlüsselkarten</h4>
     <p class="sub" style="margin:0 0 10px">Darauf läuft das Deck hinaus – diese Karten willst du ausspielen und schützen.</p>
     <div class="minicards">${g.keyCards.map(k => mini(k.card, k.count)).join('')}</div>
+    <div class="lines" style="margin-top:10px">${g.keyCards.map(k => `<div class="line" style="display:block">
+      <b>${esc(cname(k.card))}</b><br><span class="e">${esc(k.why)}</span></div>`).join('')}</div>
+
+    <h4>Bedingungen im Deck</h4>
+    <p class="sub" style="margin:0 0 10px">Karten, deren Text etwas voraussetzt – und ob dieses Deck es liefert.</p>
+    <div class="lines">${g.checks.map(c => `<div class="line ${c.ok ? '' : 'missing'}" style="display:block">
+      <b>${c.ok ? '✓' : '✗'} ${c.count}× ${esc(cname(c.card))}</b><br><span class="e">${esc(c.text)}</span></div>`).join('')
+      || '<div class="line">Keine Karte im Deck stellt Bedingungen.</div>'}</div>
 
     <h4>Startblatt</h4>
     <p class="sub" style="margin:0 0 10px">Günstige starke Karten, auf die du beim Mulligan hoffst.</p>
@@ -255,12 +292,14 @@ function guideBlock(d) {
     <div class="lines">${d.battlefields.map(b => `<div class="line" style="display:block">
       <b>${esc(cname(b.card))}</b><br><span class="e">${esc(b.card.text || '–')}</span></div>`).join('')}</div>
 
-    <p class="sub" style="margin:16px 0 0;font-size:12px">Aus der Zusammensetzung des Decks abgeleitet: Kurve, Kartentypen,
-      Domains, Tag-Überschneidung mit der Legende und Schlüsselwörter im Kartentext. Keine Metaanalyse.</p>
+    <p class="sub" style="margin:16px 0 0;font-size:12px">Aus den Kartentexten abgeleitet: Motor der Legende, Bedingungen und
+      Zusatzkosten jeder Karte, Kurve, Kartentypen und Domains.
+      ${d.metaDecks ? `Dazu ${d.metaDecks} gespeicherte Meta-Deck${d.metaDecks === 1 ? '' : 's'} dieser Legende.` : 'Mit gespeicherten Meta-Decks dieser Legende (Tab „Meta-Decks") wird der Deckbau genauer.'}</p>
   </div>`;
 }
 
-const lineRow = (n, c, label) => `<div class="line"><span class="c">${n}×</span><span class="n">${esc(label ?? cname(c))}</span>
+const lineRow = (n, c, label, warn = []) => `<div class="line"><span class="c">${n}×</span><span class="n">${esc(label ?? cname(c))}
+  ${warn.map(w => `<br><small class="warn">⚠ ${esc(w)}</small>`).join('')}</span>
   <span class="e">${ident(c)}</span></div>`;
 
 /* --- Meta-Decks --- */
@@ -284,11 +323,16 @@ function viewMeta() {
   return `
     <h2>Meta-Decks</h2>
     <p class="sub">Deckliste von riftdecks.com, riftbound.gg, riftools.app oder aus einem Turnierbericht einfügen –
-       die App rechnet sofort aus, wie weit du davon entfernt bist und welche Karten dir fehlen.</p>
+       die App rechnet sofort aus, wie weit du davon entfernt bist und welche Karten dir fehlen.
+       <b>Enthält die Liste eine Legende, fließt sie in den Deckbau ein:</b> Karten, die in Meta-Decks dieser Legende
+       stecken, werden beim Bau deines Decks bevorzugt. Du kannst hier auch dein eigenes Deck einfügen und prüfen lassen.</p>
     <div class="card" style="margin-bottom:20px">
       <div class="row" style="margin-bottom:10px">
         <input type="text" id="metaName" placeholder="Deckname, z. B. Kennen Tempest (Tier 1)" style="flex:1;min-width:200px">
       </div>
+      <label style="display:flex;gap:8px;align-items:flex-start;margin-bottom:10px;font-size:13px;color:var(--dim)">
+        <input type="checkbox" id="metaOwn" style="width:auto;flex:none;margin-top:2px"> Mein eigenes Deck – nur prüfen, nicht in den Deckbau einbeziehen
+      </label>
       <textarea id="metaText" placeholder="Deckliste einfügen – gleiches Format wie der Sammlungs-Export"></textarea>
       <div class="row" style="margin-top:12px"><button class="btn primary" id="addMeta">Deck speichern &amp; auswerten</button></div>
     </div>
@@ -303,6 +347,7 @@ function viewMeta() {
             <button class="btn sm" data-delmeta="${esc(d.id)}">löschen</button></div>
         </div>
         <div class="bar-track"><div class="bar-fill ${cls === 'ok' ? '' : cls}" style="width:${d.a.pct}%"></div></div>
+        ${metaCheck(d.text, d.own)}
         ${miss.length ? `<h3>Dir fehlen ${d.a.missing} Karten</h3>
           <div class="lines">${miss.map(r => `<div class="line missing"><span class="c">fehlt ${r.missing}×</span>
             <span class="n">${esc(r.card ? cname(r.card) : r.raw.rawName)}</span>
@@ -310,6 +355,20 @@ function viewMeta() {
           : '<div class="notice" style="margin-top:12px">Dieses Deck kannst du komplett bauen.</div>'}
       </div>`;
     }).join('') : '<div class="empty">Noch keine Meta-Decks gespeichert.</div>'}`;
+}
+
+/** Deck-Check einer eingefügten Liste: unspielbare Karten, Motor der Legende. */
+function metaCheck(text, own) {
+  const { legend, main } = parseMetaList(text);
+  if (!legend) return `<p class="sub" style="margin:10px 0 0">Keine Legende in der Liste erkannt – für Deck-Check und Deckbau
+    muss die Legende mit in der Liste stehen.</p>`;
+  const r = checkDeck(legend, main, state.db.cards);
+  const engine = r.engine.map(e => `<div class="line" style="display:block"><b>Motor: ${esc(e.text)}</b><br>
+    <span class="e">${String(e.have).replace('.', ',')} im Deck (${esc(e.label)}) – ${e.sat >= 0.8 ? 'läuft zuverlässig' : e.sat >= 0.4 ? 'läuft teilweise' : 'zu wenig'}</span></div>`).join('');
+  const probs = r.problems.map(p => `<div class="line missing" style="display:block"><b>${p.count}× ${esc(cname(p.card))}</b><br>
+    <span class="e">${esc(p.text)}</span></div>`).join('');
+  return `<h3>Deck-Check · ${esc(legend.fullName ?? legend.name)} <span class="tag">${own ? 'nur geprüft' : 'fließt in den Deckbau ein'}</span></h3>
+    <div class="lines">${engine}${probs || '<div class="line">Keine Karte mit unerfüllter Bedingung.</div>'}</div>`;
 }
 
 /* --- Wunschliste --- */
@@ -427,10 +486,12 @@ document.addEventListener('click', async e => {
     const name = $('#metaName').value.trim() || 'Unbenanntes Deck';
     const text = $('#metaText').value.trim();
     if (!text) return;
-    store(KEY.meta, [...read(KEY.meta, []), { id: String(Date.now()), name, text }]);
+    const own = $('#metaOwn').checked;
+    store(KEY.meta, [...read(KEY.meta, []), { id: String(Date.now()), name, text, own }]);
+    state.decks = null;
     return render();
   }
-  if (t.dataset.delmeta) { store(KEY.meta, read(KEY.meta, []).filter(d => d.id !== t.dataset.delmeta)); return render(); }
+  if (t.dataset.delmeta) { store(KEY.meta, read(KEY.meta, []).filter(d => d.id !== t.dataset.delmeta)); state.decks = null; return render(); }
   if (t.id === 'addFriend') {
     const name = $('#friendName').value.trim() || 'Freund';
     const text = $('#friendText').value.trim();

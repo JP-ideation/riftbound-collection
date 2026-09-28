@@ -2,10 +2,9 @@
  * Spielhilfe zu einem generierten Deck.
  *
  * Alle Aussagen werden aus dem Deck selbst abgeleitet – Kurve, Kartentypen,
- * Domainverteilung, Tag-Überschneidung mit der Legende und Schlüsselwörter im
- * Kartentext. Es steckt bewusst kein Regel- oder Metawissen darin, das sich
- * nicht aus den Kartendaten belegen lässt; jede Aussage nennt die Zahl,
- * auf der sie beruht.
+ * Domainverteilung, der Motor der Legende (was ihr Text belohnt) und die
+ * Bedingungen der einzelnen Karten (was ihr Text voraussetzt). Jede Aussage
+ * nennt die Zahl, auf der sie beruht.
  */
 
 const RX = {
@@ -20,9 +19,10 @@ const RX = {
 const count = (main, re) => main.filter(m => re.test(m.card.text ?? '')).reduce((s, m) => s + m.count, 0);
 const countIf = (main, fn) => main.filter(m => fn(m.card)).reduce((s, m) => s + m.count, 0);
 
+const isEngine = m => (m.why ?? []).some(w => w.engine);
+
 export function buildGuide(deck) {
   const main = deck.main;
-  const legendTags = new Set(deck.legend.tags ?? []);
 
   const total = deck.counts.main || 1;
   const cheap = countIf(main, c => (c.energy ?? 0) <= 2);
@@ -31,7 +31,7 @@ export function buildGuide(deck) {
   const units = countIf(main, c => c.type === 'unit');
   const spells = countIf(main, c => c.type === 'spell');
   const gear = countIf(main, c => c.type === 'gear');
-  const core = countIf(main, c => (c.tags ?? []).some(t => legendTags.has(t)));
+  const core = main.filter(isEngine).reduce((n, m) => n + m.count, 0);
 
   const removal = count(main, RX.removal);
   const draw = count(main, RX.draw);
@@ -42,8 +42,9 @@ export function buildGuide(deck) {
   return {
     archetype: archetype(deck, stats),
     plan: plan(deck, stats),
-    keyCards: keyCards(deck, legendTags),
+    keyCards: keyCards(deck),
     mulligan: mulligan(main),
+    checks: checks(main),
     strengths: strengths(deck, stats),
     weaknesses: weaknesses(deck, stats),
     stats,
@@ -74,8 +75,13 @@ function plan(deck, s) {
 
   out.push(`Punkte kommen über Schlachtfelder – erobern und halten. Alles hier zielt darauf, dort länger Einheiten stehen zu haben als der Gegner.`);
 
-  if (s.core >= 12) out.push(`${s.core} deiner 40 Karten teilen einen Tag mit ${ziel}. Das ist der Kern: Diese Karten verstärken sich gegenseitig, spiel sie zusammen statt vereinzelt.`);
-  else if (s.core > 0) out.push(`Nur ${s.core} Karten teilen einen Tag mit ${ziel} – die Legende ist hier eher Beiwerk als Motor. Das Deck gewinnt über einzelne starke Karten, nicht über Synergie.`);
+  for (const e of deck.engine ?? []) {
+    out.push(`${ziel} ${e.text}. ${String(e.have).replace('.', ',')} Punkte davon liefert dein Deck (${e.label}). `
+      + (e.sat >= 0.8 ? 'Der Motor läuft zuverlässig – nutze die Legende jede Runde.'
+        : e.sat >= 0.4 ? 'Der Motor läuft, aber nicht jede Runde. Heb die passenden Karten für den Zug auf, in dem du die Legende brauchst.'
+          : 'Zu wenig – die Legende wird selten aktiv. Genau diese Karten fehlen dem Deck am meisten.'));
+  }
+  if (!(deck.engine ?? []).length) out.push(`Die Legende hat keinen Motor, der bestimmte Karten verlangt – das Deck gewinnt über einzelne starke Karten.`);
 
   if (s.units >= 26) out.push(`Mit ${s.units} Einheiten spielst du über Masse: mehrere Schlachtfelder gleichzeitig besetzen und den Gegner zwingen, sich zu entscheiden.`);
   else if (s.units <= 20) out.push(`Nur ${s.units} Einheiten – jede einzelne zählt. Wirf sie nicht in ungünstige Kämpfe, sondern warte auf den Zug, in dem du den Kampf gewinnst.`);
@@ -88,21 +94,32 @@ function plan(deck, s) {
 }
 
 /* -------------------------------------------------------- Schlüsselkarten */
-function keyCards(deck, legendTags) {
-  const synergy = deck.main.filter(m => (m.card.tags ?? []).some(t => legendTags.has(t)));
-  // Ohne Legenden-Synergie (kommt bei schwachen Legenden vor) einfach die
-  // stärksten Karten zeigen, statt gar nichts.
-  const base = synergy.length >= 3 ? synergy : deck.main;
+function keyCards(deck) {
+  // Karten, die den Motor der Legende antreiben oder ihr Champion sind; ohne
+  // solche Karten einfach die stärksten.
+  const core = deck.main.filter(m => isEngine(m) || (m.why ?? []).some(w => w.ok && /^(Champion|Signature)/.test(w.text)));
+  const base = core.length >= 3 ? core : deck.main;
   return [...base]
     .sort((a, b) => b.score - a.score)
     .slice(0, 6)
     .map(m => ({
       card: m.card,
       count: m.count,
-      why: (m.card.tags ?? []).some(t => legendTags.has(t))
-        ? `Teilt einen Tag mit deiner Legende`
-        : `Stärkste Einzelkarte im Deck`,
+      why: (m.why ?? []).find(w => w.ok)?.text ?? 'Stärkste Einzelkarte im Deck',
     }));
+}
+
+/* ---------------------------------------------------- Bedingungen der Karten */
+/**
+ * Jede Karte, deren Text etwas voraussetzt (XP, Stamm, Zauber …), mit dem
+ * Stand im Deck. Nicht erfüllte zuerst.
+ */
+function checks(main) {
+  const out = [];
+  for (const m of main) {
+    for (const w of m.why ?? []) if (w.need) out.push({ card: m.card, count: m.count, ok: w.ok, sat: w.sat, text: w.text });
+  }
+  return out.sort((a, b) => a.sat - b.sat);
 }
 
 /* -------------------------------------------------------------- Startblatt */
@@ -117,7 +134,7 @@ function mulligan(main) {
 /* ---------------------------------------------------- Stärken / Schwächen */
 function strengths(deck, s) {
   const out = [];
-  if (s.core >= 12) out.push(`${s.core} Karten mit Legenden-Tag – geschlossenes Thema`);
+  if (s.core >= 12) out.push(`${s.core} Karten treiben den Motor der Legende an`);
   if (s.cheap >= 12) out.push(`${s.cheap} günstige Karten: kaum tote Starthände`);
   if (s.removal >= 8) out.push(`${s.removal} Karten mit Entfernung oder Schaden`);
   if (s.draw >= 5) out.push(`${s.draw} Karten ziehen nach`);
@@ -132,7 +149,10 @@ function weaknesses(deck, s) {
   if (s.removal <= 4) out.push(`Nur ${s.removal} Karten gegen gegnerische Einheiten: große Einheiten bleiben stehen`);
   if (s.draw <= 2) out.push(`Nur ${s.draw} Karten ziehen nach: leere Hand ist schwer aufzuholen`);
   if (s.units <= 20) out.push(`Nur ${s.units} Einheiten: wenig Präsenz, um Schlachtfelder zu halten`);
-  if (s.core <= 8) out.push(`Nur ${s.core} Karten mit Legenden-Tag: wenig Synergie mit ${deck.champion ?? 'der Legende'}`);
+  if ((deck.engine ?? []).length && s.core <= 8) out.push(`Nur ${s.core} Karten treiben den Motor der Legende an: ${deck.champion ?? 'die Legende'} bleibt oft ungenutzt`);
+  const open = checks(deck.main).filter(c => !c.ok);
+  if (open.length) out.push(`${open.reduce((n, c) => n + c.count, 0)} Karten, deren Bedingung das Deck nur teilweise erfüllt (siehe „Bedingungen im Deck")`);
+  if (deck.hasChampion === false) out.push(`Keine Champion-Einheit von ${deck.champion} im Bestand – das Deck ist so nicht turnierlegal`);
   if (s.big >= 14) out.push(`${s.big} Karten ab 5 Energie: in den ersten Zügen passiert wenig`);
   if (s.spells + s.gear <= 6) out.push(`Nur ${s.spells} Zauber und ${s.gear} Ausrüstung: fast reines Einheitendeck, wenig Flexibilität`);
   if (deck.identity.length > 1) out.push(`Zwei Domains: Runenverteilung kann klemmen`);

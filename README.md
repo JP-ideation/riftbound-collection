@@ -14,7 +14,7 @@ Datenbank – die Sammlung bleibt im Browser des jeweiligen Geräts.
 | --- | --- |
 | **Sammlung** | Import per Textdatei, Abgleich mit der offiziellen Kartendatenbank, Filter nach Set, Domain, Typ, Seltenheit und Kartentext |
 | **Decks** | Für **jede** Legende im Bestand das stärkste legale Deck: 40 Karten Hauptdeck, 12 Runen, 3 Schlachtfelder, max. 3 Kopien, Domain-Identität der Legende. Mit Energiekurve, Deckwert und Spielhilfe |
-| **Meta-Decks** | Beliebige Deckliste einfügen → Vollständigkeit in Prozent und exakte Liste der fehlenden Karten |
+| **Meta-Decks** | Beliebige Deckliste einfügen → Vollständigkeit in Prozent, fehlende Karten und Deck-Check (unspielbare Karten, unerfüllte Bedingungen). Meta-Listen mit Legende fließen in den Deckbau ein |
 | **Wunschliste** | Bündelt alles Fehlende; Karten, die in mehreren Decks gebraucht werden, stehen oben |
 | **Teilen** | Sammlung exportieren, Sammlungen von Freunden einfügen und beidseitig abgleichen |
 
@@ -106,7 +106,8 @@ index.html            App-Gerüst
 app.css               Styles
 js/parser.js          Textformat einlesen und schreiben
 js/db.js              Kartendatenbank laden, Sammlung zuordnen
-js/deckbuilder.js     Deckgenerator, Bewertung, Wunschliste
+js/mechanics.js       Kartenmechanik aus dem Kartentext: was eine Karte braucht und liefert
+js/deckbuilder.js     Deckgenerator, Bewertung im Deckzusammenhang, Deck-Check, Wunschliste
 js/guide.js           Spielhilfe je Deck (aus der Deckzusammensetzung)
 js/app.js             Oberfläche und Zustand
 scripts/fetch-cards.mjs   Kartendaten von Riot holen
@@ -116,49 +117,71 @@ sw.js                 Service Worker für Offline-Betrieb
 
 ## Wie der Deckbau funktioniert
 
-Für jede Legende im Bestand:
+Bewertet wird nicht die Einzelkarte, sondern die Karte **in diesem Deck**.
 
-1. **Pool bilden** – alle eigenen Einheiten, Zauber und Ausrüstung, deren
-   Domains in der Identität der Legende liegen (farblos zählt immer).
-2. **Bewerten** – Seltenheit als Grundwert, dicke Boni für Karten mit den Tags
-   der Legende (Champion-Synergie), kleinere Boni für im Pool gut vertretene
-   Stämme, dazu Statwert (Might pro Energie) und Textschlüsselwörter.
-3. **Kurvenbewusst füllen** – die 40 Plätze werden entlang einer Zielkurve
-   vergeben, damit nicht nur teure Karten im Deck landen. Was danach offen
-   bleibt, wird nach reinem Score aufgefüllt.
-4. **Runen verteilen** – 12 Runen im Verhältnis des tatsächlichen Domain-Bedarfs
-   des gebauten Hauptdecks.
-5. **Typmischung wahren** – ohne Gegengewicht entstünden Decks aus 38 Einheiten
-   und einem Zauber: 99 % der Einheiten tragen Tags, aber nur 18 % der Zauber,
-   der Synergiebonus bevorzugt Einheiten also strukturell. Als Bezugsgröße
-   dient das Verhältnis, in dem das Spiel die Typen druckt (rund 63/26/11).
-6. **Wunschliste ableiten** – der komplette offizielle Kartenpool der Identität
-   wird gegen das gebaute Deck gehalten; was besser wäre als die schwächste
-   Karte im Deck, landet als Empfehlung in der Liste.
+### Kartenmechanik (`js/mechanics.js`)
 
-Kurve und Typmischung werden dabei je zur Hälfte aus einer Ausgangsverteilung
-und dem, was der eigene Pool von sich aus hergibt, gemischt – sonst sähe jedes
-Deck gleich aus.
+Aus dem offiziellen Kartentext wird für jede Karte abgeleitet:
 
-Die Bewertung ist eine Heuristik, kein Turniersieger-Orakel – sie ersetzt keine
-echte Metaanalyse, findet aber zuverlässig die stärkste Richtung im eigenen Pool.
+* **liefert** – XP-Quelle (`[Hunt]`, „gain N XP"), spielt Karten nicht aus der
+  Hand (`[Hidden]`, `[Flow]`, aus dem Ablagestapel, vom Deck, Token), schaut
+  oben ins Deck, Stun, Buff, Mighty, Equipment, Einheit mit Stammes-Tag …
+* **braucht** – XP zum Ausgeben (`Spend 3 XP`, `[Level 3]`), Pflicht-Zusatzkosten
+  („As an additional cost to play me, kill a Bird, Cat, Dog, or Poro"),
+  Stammesbezug („if you control a Poro"), Zauber, Equipment, betäubte Gegner …
+
+Erinnerungstexte in Klammern werden dabei ignoriert – sonst gälte jede Karte mit
+`[Stun]` als Karte, die betäubte Gegner braucht.
+
+### Bewertung
+
+1. **Regeln** – nur Karten der Domain-Identität, keine Spielmarken (Gold, Bird-
+   Token …), keine Signature-Karten fremder Champions, höchstens 3
+   Signature-Karten, mindestens eine Champion-Einheit des Legenden-Champions.
+2. **Motor der Legende** – der Legendentext sagt, was sie will. *Heart of the
+   Tempest* (Kennen) wird aufgeladen, wenn Karten **nicht aus der Hand**
+   gespielt werden; Karten, die genau das tun, bekommen einen großen Bonus mit
+   abnehmendem Ertrag. Ein geteilter Tag wie „Yordle" zählt dagegen nicht mehr
+   pauschal – das hatte früher Decks voller Yordles erzeugt, die mit Kennens
+   Legende nichts anfangen.
+3. **Bedingungen** – was eine Karte braucht, muss das Deck liefern. Pflichtkosten
+   ohne passendes Futter machen eine Karte unspielbar (Stalking Wolf ohne
+   Bird/Cat/Dog/Poro). XP wird beim Ausgeben verbraucht: viele XP-Verbraucher
+   teilen sich dieselben Quellen und werden entsprechend abgewertet.
+4. **Enabler** – was eine Karte liefert, zählt so viel, wie andere Karten im
+   Deck es brauchen.
+5. **Meta** – gespeicherte Meta-Decklisten mit Legende: Karten, die in Decks
+   derselben Legende stecken, werden nach Häufigkeit bevorzugt.
+6. **Grundwert** – Seltenheit, Might im Vergleich zu gleich teuren Einheiten,
+   Schlüsselwörter, Abzug für sehr teure Karten. Kosten­senkungen wie bei Rhasa
+   („kostet 1 weniger je Karte im Ablagestapel") werden berücksichtigt.
+
+Deckbau und Bewertung laufen im Wechsel: Deck bauen → mit dem neuen Deck neu
+bewerten → neu bauen. Enabler und Verbraucher kommen so gemeinsam ins Deck oder
+fliegen gemeinsam raus; das beste Ergebnis gewinnt. Kurve (70 % feste
+Ausgangskurve, 30 % Pool) und Typmischung (halb Druckverhältnis, halb Pool)
+halten das Deck spielbar. Runen werden nach Domain-Bedarf verteilt.
+
+Die **Wunschliste** hält den kompletten offiziellen Kartenpool der Identität
+gegen das fertige Deck – bewertet im Kontext dieses Decks.
 
 ## Spielhilfe
 
-Jedes Deck bekommt einen Abschnitt „So spielst du das Deck": Archetyp aus der
-Kurve, Spielplan, Schlüsselkarten, Mulligan-Empfehlung, Stärken und Schwächen,
-dazu der Fähigkeitstext der Legende und die eigenen Schlachtfelder.
-
-Alle Aussagen sind aus der Deckzusammensetzung abgeleitet und nennen die Zahl,
-auf der sie beruhen („Nur 4 Karten gegen gegnerische Einheiten"). Es steckt
-bewusst kein Regel- oder Metawissen darin, das sich nicht aus den Kartendaten
-belegen lässt.
+Jedes Deck bekommt einen Abschnitt „So spielst du das Deck": Archetyp, der Motor
+der Legende und wie viele Karten ihn antreiben, Schlüsselkarten mit Begründung,
+**Bedingungen im Deck** (jede Karte, deren Text etwas voraussetzt, mit ✓/✗),
+Mulligan, Stärken und Schwächen. Jede Aussage nennt die Zahl, auf der sie beruht.
 
 ## Grenzen
 
 * Es gibt keine offene API für Meta-Decks. Tier-Listen von riftdecks.com,
   riftbound.gg, riftools.app oder riftmana.com müssen als Deckliste eingefügt
-  werden – die Auswertung passiert dann automatisch.
+  werden (mit Legende) – Auswertung und Einfluss auf den Deckbau passieren dann
+  automatisch.
+* Die Kartenmechanik wird per Textmuster erkannt, nicht per vollständigem
+  Regelwerk. Sie deckt die Motoren ab, die über Spielbarkeit entscheiden (XP,
+  Pflichtopfer, Stämme, Hidden/Flow, Zauber, Equipment, Stun, Buff, Mighty),
+  kennt aber nicht jede Einzelinteraktion.
 * Spielmarken (Token, `#T01`) sind in der offiziellen Galerie nicht vollständig
   enthalten und bleiben beim Import ohne Treffer. Für den Deckbau egal.
 * Freunde-Abgleich läuft über Copy-Paste, nicht über Accounts. Für echte

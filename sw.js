@@ -5,10 +5,10 @@
  * Rueckfall. So zieht ein neuer Deploy sofort, statt eine alte Version
  * festzuhalten. Kartenbilder vom Riot-CDN: Cache zuerst, die aendern sich nicht.
  */
-const V = 'rb-shell-v3';
+const V = 'rb-shell-v4';
 const IMG = 'rb-img-v1';
 const SHELL = ['./', 'index.html', 'app.css', 'manifest.webmanifest',
-  'js/app.js', 'js/db.js', 'js/parser.js', 'js/deckbuilder.js', 'js/guide.js',
+  'js/app.js', 'js/db.js', 'js/parser.js', 'js/deckbuilder.js', 'js/mechanics.js', 'js/guide.js',
   'data/cards.json', 'icons/icon.svg'];
 
 self.addEventListener('install', e => {
