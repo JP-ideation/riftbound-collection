@@ -1,0 +1,1366 @@
+{
+ "updated": "2026-09-28",
+ "note": "Kernlisten aus Top-8- und Best-Of-Decks der Regional Qualifiers der Vendetta-Saison (Utrecht, Barcelona, Singapur, Sydney, Hartford). Aus öffentlich einsehbaren Turnierberichten übernommen und gegen die offizielle Kartendatenbank, die Domain-Identität der Legende und die Bannliste vom 18.09.2026 geprüft. Teils unvollständig; Sideboards nicht enthalten.",
+ "decks": [
+  {
+   "name": "Rengar – Pridestalker · Regional Qualifier Barcelona/Singapur (Prismaticism, Sieger RQ Los Angeles)",
+   "legend": "Pridestalker",
+   "event": "Regional Qualifier Barcelona/Singapur (Prismaticism, Sieger RQ Los Angeles)",
+   "placement": "Top 8",
+   "date": "2026-09",
+   "source": "riftmana.com / mobalytics.gg",
+   "cards": [
+    [
+     "Rengar, Trophy Hunter",
+     1
+    ],
+    [
+     "Punch First",
+     3
+    ],
+    [
+     "Sabotage",
+     2
+    ],
+    [
+     "Inferna",
+     3
+    ],
+    [
+     "Irresistible Faefolk",
+     3
+    ],
+    [
+     "Pit Rookie",
+     3
+    ],
+    [
+     "Thrill of the Hunt",
+     3
+    ],
+    [
+     "First Mate",
+     2
+    ],
+    [
+     "Grim Apothecary",
+     3
+    ],
+    [
+     "Kinkou Initiate",
+     3
+    ],
+    [
+     "Nidalee, Cat Form",
+     2
+    ],
+    [
+     "Pakaa Cub",
+     1
+    ],
+    [
+     "Pyke, Dockside Butcher",
+     1
+    ],
+    [
+     "Rampage",
+     2
+    ],
+    [
+     "Kai'Sa, Survivor",
+     3
+    ],
+    [
+     "Noxus Hopeful",
+     3
+    ],
+    [
+     "Darius, Trifarian",
+     1
+    ],
+    [
+     "Ferrous Forerunner",
+     1
+    ]
+   ]
+  },
+  {
+   "name": "Master Yi – Wuju Bladesman · Regional Qualifier Utrecht (Bakura)",
+   "legend": "Wuju Bladesman, Starter",
+   "event": "Regional Qualifier Utrecht (Bakura)",
+   "placement": "Top 8",
+   "date": "2026",
+   "source": "mobalytics.gg",
+   "cards": [
+    [
+     "Lonely Poro",
+     3
+    ],
+    [
+     "Pit Rookie",
+     3
+    ],
+    [
+     "Scuttle Crab",
+     3
+    ],
+    [
+     "First Mate",
+     3
+    ],
+    [
+     "Akshan, Mischievous",
+     2
+    ],
+    [
+     "Rengar, Trophy Hunter",
+     3
+    ],
+    [
+     "Ruin Runner",
+     2
+    ],
+    [
+     "Zhonya's Hourglass",
+     2
+    ],
+    [
+     "Charm",
+     3
+    ],
+    [
+     "Defy",
+     3
+    ],
+    [
+     "En Garde",
+     2
+    ],
+    [
+     "Punch First",
+     3
+    ],
+    [
+     "Sabotage",
+     1
+    ]
+   ]
+  },
+  {
+   "name": "Irelia – Blade Dancer · Regional Qualifier Singapur (Big Willy Dfoe)",
+   "legend": "Blade Dancer",
+   "event": "Regional Qualifier Singapur (Big Willy Dfoe)",
+   "placement": "Best-Of",
+   "date": "2026-09-05",
+   "source": "mobalytics.gg",
+   "cards": [
+    [
+     "Irelia, Fervent",
+     1
+    ],
+    [
+     "Lonely Poro",
+     1
+    ],
+    [
+     "Scuttle Crab",
+     3
+    ],
+    [
+     "Tideturner",
+     3
+    ],
+    [
+     "Pyke, Returned",
+     1
+    ],
+    [
+     "Akali, Silent",
+     2
+    ],
+    [
+     "Stellacorn Herder",
+     3
+    ],
+    [
+     "Guardian Angel",
+     2
+    ],
+    [
+     "Boots of Swiftness",
+     3
+    ],
+    [
+     "Edge of Night",
+     1
+    ],
+    [
+     "Charm",
+     2
+    ],
+    [
+     "Defiant Dance",
+     3
+    ],
+    [
+     "Defy",
+     3
+    ],
+    [
+     "En Garde",
+     2
+    ],
+    [
+     "Discipline",
+     3
+    ],
+    [
+     "Flash",
+     2
+    ],
+    [
+     "Rebuke",
+     1
+    ],
+    [
+     "Ride the Wind",
+     2
+    ]
+   ]
+  },
+  {
+   "name": "Akali – Rogue Assassin · Regional Qualifier Barcelona (ASC HaruKaze)",
+   "legend": "Rogue Assassin",
+   "event": "Regional Qualifier Barcelona (ASC HaruKaze)",
+   "placement": "Best-Of",
+   "date": "2026-08",
+   "source": "mobalytics.gg",
+   "cards": [
+    [
+     "Akali, Deadly Weapon",
+     1
+    ],
+    [
+     "Lonely Poro",
+     3
+    ],
+    [
+     "Scuttle Crab",
+     3
+    ],
+    [
+     "Stellacorn Herder",
+     3
+    ],
+    [
+     "Irelia, Fervent",
+     1
+    ],
+    [
+     "Astral Heron",
+     1
+    ],
+    [
+     "Long Sword",
+     2
+    ],
+    [
+     "Zhonya's Hourglass",
+     2
+    ],
+    [
+     "Defy",
+     3
+    ],
+    [
+     "En Garde",
+     2
+    ],
+    [
+     "Shuriken Flip",
+     3
+    ],
+    [
+     "Discipline",
+     3
+    ],
+    [
+     "Falling Star",
+     2
+    ]
+   ]
+  },
+  {
+   "name": "Kennen – Heart of the Tempest · Regional Qualifier Barcelona (ECL Mosik)",
+   "legend": "Heart of the Tempest",
+   "event": "Regional Qualifier Barcelona (ECL Mosik)",
+   "placement": "Top 8",
+   "date": "2026-08-23",
+   "source": "mobalytics.gg",
+   "cards": [
+    [
+     "Kennen, Storm of Shuriken",
+     1
+    ],
+    [
+     "Gust Monk",
+     1
+    ],
+    [
+     "Tideturner",
+     2
+    ],
+    [
+     "Traveling Merchant",
+     3
+    ],
+    [
+     "Fizz, Trickster",
+     2
+    ],
+    [
+     "Nocturne, Horrifying",
+     3
+    ],
+    [
+     "Tail-Cloaked Matriarch",
+     1
+    ],
+    [
+     "Baron Nashor",
+     1
+    ],
+    [
+     "Rhasa the Sunderer",
+     3
+    ],
+    [
+     "Seal of Discord",
+     3
+    ],
+    [
+     "Last Rites",
+     2
+    ],
+    [
+     "Gust",
+     2
+    ],
+    [
+     "Lightning Rush",
+     3
+    ],
+    [
+     "Hard Bargain",
+     1
+    ],
+    [
+     "Rebuke",
+     1
+    ],
+    [
+     "Ride the Wind",
+     3
+    ],
+    [
+     "Switcheroo",
+     1
+    ],
+    [
+     "Star-Crossed",
+     2
+    ],
+    [
+     "Up from the Deep",
+     1
+    ],
+    [
+     "The Harrowing",
+     1
+    ]
+   ]
+  },
+  {
+   "name": "Jayce – Defender of Tomorrow · Regional Qualifier Singapur (justmilkey)",
+   "legend": "Defender of Tomorrow",
+   "event": "Regional Qualifier Singapur (justmilkey)",
+   "placement": "Best-Of",
+   "date": "2026-09",
+   "source": "mobalytics.gg",
+   "cards": [
+    [
+     "Jayce, Brilliant Inventor",
+     1
+    ],
+    [
+     "Elder Dragon",
+     3
+    ],
+    [
+     "Garbage Grabber",
+     2
+    ],
+    [
+     "Platewyrm Egg",
+     3
+    ],
+    [
+     "Gutter Palace",
+     1
+    ],
+    [
+     "Dazzling Aurora",
+     3
+    ],
+    [
+     "Bellows Breath",
+     3
+    ],
+    [
+     "Flurry of Blades",
+     2
+    ],
+    [
+     "Sabotage",
+     2
+    ],
+    [
+     "Downstage Dramatics",
+     1
+    ],
+    [
+     "Dredge Up",
+     3
+    ],
+    [
+     "Mobilize",
+     3
+    ],
+    [
+     "Catalyst of Aeons",
+     3
+    ],
+    [
+     "Deadly Flourish",
+     1
+    ],
+    [
+     "Rocket Barrage",
+     1
+    ],
+    [
+     "Promising Future",
+     3
+    ],
+    [
+     "Sprite Burst",
+     2
+    ],
+    [
+     "Clairvoyance",
+     3
+    ]
+   ]
+  },
+  {
+   "name": "Rek'Sai – Void Burrower · Regional Qualifier Barcelona (Kevplayer)",
+   "legend": "Void Burrower",
+   "event": "Regional Qualifier Barcelona (Kevplayer)",
+   "placement": "Best-Of",
+   "date": "2026-08",
+   "source": "mobalytics.gg",
+   "cards": [
+    [
+     "Rek'Sai, Breacher",
+     1
+    ],
+    [
+     "Carrion Dredger",
+     3
+    ],
+    [
+     "Honest Broker",
+     3
+    ],
+    [
+     "Inferna",
+     2
+    ],
+    [
+     "Noxian Emissary",
+     3
+    ],
+    [
+     "Faithful Manufactor",
+     3
+    ],
+    [
+     "Vanguard Captain",
+     2
+    ],
+    [
+     "Vi, Peacekeeper",
+     1
+    ],
+    [
+     "Noxus Hopeful",
+     3
+    ],
+    [
+     "Undertitan",
+     3
+    ],
+    [
+     "Rage Amplifier",
+     1
+    ],
+    [
+     "Blood Rush",
+     3
+    ],
+    [
+     "Cleave",
+     2
+    ],
+    [
+     "Cull the Weak",
+     3
+    ],
+    [
+     "Falling Star",
+     3
+    ],
+    [
+     "Hidden Blade",
+     1
+    ],
+    [
+     "Void Rush",
+     3
+    ]
+   ]
+  },
+  {
+   "name": "Ezreal – Prodigal Explorer · Regional Qualifier Barcelona (PoW SpaghetiCode)",
+   "legend": "Prodigal Explorer",
+   "event": "Regional Qualifier Barcelona (PoW SpaghetiCode)",
+   "placement": "Best-Of",
+   "date": "2026-08",
+   "source": "mobalytics.gg",
+   "cards": [
+    [
+     "Ezreal, Prodigy",
+     1
+    ],
+    [
+     "Bewitching Spirit",
+     3
+    ],
+    [
+     "Fizz, Trickster",
+     2
+    ],
+    [
+     "Vex, Apathetic",
+     2
+    ],
+    [
+     "Thousand-Tailed Watcher",
+     2
+    ],
+    [
+     "Pack of Wonders",
+     2
+    ],
+    [
+     "Bellows Breath",
+     3
+    ],
+    [
+     "Stupefy",
+     3
+    ],
+    [
+     "Deadly Flourish",
+     1
+    ]
+   ]
+  },
+  {
+   "name": "Azir – Emperor of the Sands · Regional Qualifier Utrecht (Squirtle)",
+   "legend": "Emperor of the Sands",
+   "event": "Regional Qualifier Utrecht (Squirtle)",
+   "placement": "1.",
+   "date": "2026",
+   "source": "mobalytics.gg",
+   "cards": [
+    [
+     "Azir, Sovereign",
+     1
+    ],
+    [
+     "Scuttle Crab",
+     1
+    ],
+    [
+     "Vi, Peacekeeper",
+     1
+    ],
+    [
+     "Doran's Shield",
+     3
+    ],
+    [
+     "Eye of the Herald",
+     3
+    ],
+    [
+     "Soul Sword",
+     3
+    ],
+    [
+     "Brutalizer",
+     3
+    ],
+    [
+     "B.F. Sword",
+     3
+    ],
+    [
+     "Defy",
+     3
+    ],
+    [
+     "En Garde",
+     3
+    ],
+    [
+     "Deathgrip",
+     3
+    ],
+    [
+     "Discipline",
+     3
+    ],
+    [
+     "Hidden Blade",
+     3
+    ],
+    [
+     "Back Off",
+     2
+    ],
+    [
+     "Guards!",
+     2
+    ],
+    [
+     "Arise!",
+     3
+    ]
+   ]
+  },
+  {
+   "name": "Annie – Dark Child · Regional Qualifier Hartford (Prismaticism)",
+   "legend": "Dark Child, Starter",
+   "event": "Regional Qualifier Hartford (Prismaticism)",
+   "placement": "Top 8",
+   "date": "2026",
+   "source": "mobalytics.gg",
+   "cards": [
+    [
+     "Annie, Stubborn",
+     1
+    ],
+    [
+     "Inferna",
+     3
+    ],
+    [
+     "Overzealous Fan",
+     2
+    ],
+    [
+     "Traveling Merchant",
+     3
+    ],
+    [
+     "Grim Apothecary",
+     2
+    ],
+    [
+     "Rengar, Pouncing",
+     3
+    ],
+    [
+     "Kai'Sa, Survivor",
+     3
+    ],
+    [
+     "Noxus Hopeful",
+     3
+    ],
+    [
+     "Vex, Apathetic",
+     2
+    ],
+    [
+     "Ferrous Forerunner",
+     3
+    ],
+    [
+     "Long Sword",
+     3
+    ],
+    [
+     "Cleave",
+     2
+    ],
+    [
+     "Abandon",
+     1
+    ],
+    [
+     "Flash",
+     3
+    ],
+    [
+     "Hard Bargain",
+     1
+    ],
+    [
+     "Star-Crossed",
+     2
+    ]
+   ]
+  },
+  {
+   "name": "Diana – Scorn of the Moon · Regional Qualifier Sydney (CTG Alanzq)",
+   "legend": "Scorn of the Moon",
+   "event": "Regional Qualifier Sydney (CTG Alanzq)",
+   "placement": "Top 8",
+   "date": "2026",
+   "source": "mobalytics.gg",
+   "cards": [
+    [
+     "Diana, Lunari",
+     1
+    ],
+    [
+     "Plundering Poro",
+     1
+    ],
+    [
+     "Ravenbloom Student",
+     3
+    ],
+    [
+     "Tideturner",
+     3
+    ],
+    [
+     "Kha'Zix, Mutating Horror",
+     3
+    ],
+    [
+     "Vex, Apathetic",
+     3
+    ],
+    [
+     "Hwei, Brooding Painter",
+     3
+    ],
+    [
+     "Vex, Cheerless",
+     2
+    ],
+    [
+     "Thousand-Tailed Watcher",
+     1
+    ],
+    [
+     "Existential Dread",
+     1
+    ],
+    [
+     "Stupefy",
+     3
+    ],
+    [
+     "Abandon",
+     2
+    ],
+    [
+     "Flash",
+     3
+    ],
+    [
+     "Ride the Wind",
+     2
+    ],
+    [
+     "Eclipse",
+     1
+    ],
+    [
+     "Moonfall",
+     3
+    ],
+    [
+     "Star-Crossed",
+     2
+    ]
+   ]
+  },
+  {
+   "name": "Diana – Scorn of the Moon · Regional Qualifier Hartford (ASC Evansrhim)",
+   "legend": "Scorn of the Moon",
+   "event": "Regional Qualifier Hartford (ASC Evansrhim)",
+   "placement": "Top 8",
+   "date": "2026",
+   "source": "mobalytics.gg",
+   "cards": [
+    [
+     "Diana, Lunari",
+     1
+    ],
+    [
+     "Ravenbloom Student",
+     3
+    ],
+    [
+     "Tideturner",
+     3
+    ],
+    [
+     "Traveling Merchant",
+     2
+    ],
+    [
+     "Fizz, Trickster",
+     2
+    ],
+    [
+     "Vex, Apathetic",
+     3
+    ],
+    [
+     "Hwei, Brooding Painter",
+     3
+    ],
+    [
+     "Sprite Fountain",
+     1
+    ],
+    [
+     "Acceptable Losses",
+     1
+    ],
+    [
+     "Gust",
+     2
+    ],
+    [
+     "Stupefy",
+     3
+    ],
+    [
+     "Flash",
+     2
+    ],
+    [
+     "Hard Bargain",
+     2
+    ],
+    [
+     "Ride the Wind",
+     2
+    ],
+    [
+     "Smoke Screen",
+     1
+    ],
+    [
+     "Eclipse",
+     1
+    ],
+    [
+     "Moonfall",
+     3
+    ],
+    [
+     "Star-Crossed",
+     2
+    ]
+   ]
+  },
+  {
+   "name": "Sett – The Boss · Regional Qualifier Utrecht (CTCG Collin K)",
+   "legend": "The Boss",
+   "event": "Regional Qualifier Utrecht (CTCG Collin K)",
+   "placement": "3.",
+   "date": "2026",
+   "source": "mobalytics.gg",
+   "cards": [
+    [
+     "Sett, Kingpin",
+     1
+    ],
+    [
+     "Punch First",
+     1
+    ],
+    [
+     "Repulse",
+     1
+    ],
+    [
+     "Sabotage",
+     1
+    ],
+    [
+     "Challenge",
+     1
+    ],
+    [
+     "Cithria of Cloudfield",
+     1
+    ],
+    [
+     "Hidden Blade",
+     1
+    ],
+    [
+     "Irresistible Faefolk",
+     1
+    ],
+    [
+     "Pit Rookie",
+     1
+    ],
+    [
+     "Arena Bar",
+     1
+    ],
+    [
+     "Call to Glory",
+     1
+    ],
+    [
+     "First Mate",
+     1
+    ],
+    [
+     "Fiora, Victorious",
+     1
+    ],
+    [
+     "Kinkou Monk",
+     1
+    ],
+    [
+     "Rengar, Trophy Hunter",
+     1
+    ],
+    [
+     "Vi, Peacekeeper",
+     1
+    ]
+   ]
+  },
+  {
+   "name": "Viktor – Herald of the Arcane · Regional Qualifier Utrecht (Rednaxell)",
+   "legend": "Herald of the Arcane",
+   "event": "Regional Qualifier Utrecht (Rednaxell)",
+   "placement": "2.",
+   "date": "2026",
+   "source": "mobalytics.gg",
+   "cards": [
+    [
+     "Carrion Dredger",
+     3
+    ],
+    [
+     "Honest Broker",
+     3
+    ],
+    [
+     "Card Sharp",
+     2
+    ],
+    [
+     "Chakram Dancer",
+     1
+    ],
+    [
+     "Xin Zhao, Vigilant",
+     3
+    ],
+    [
+     "Vi, Peacekeeper",
+     2
+    ],
+    [
+     "Thousand-Tailed Watcher",
+     2
+    ],
+    [
+     "Sprite Fountain",
+     2
+    ],
+    [
+     "Bellows Breath",
+     2
+    ],
+    [
+     "Stupefy",
+     3
+    ],
+    [
+     "Cull the Weak",
+     3
+    ],
+    [
+     "Facebreaker",
+     1
+    ],
+    [
+     "Hidden Blade",
+     3
+    ],
+    [
+     "Salvage",
+     1
+    ],
+    [
+     "Shadow's Call",
+     2
+    ],
+    [
+     "Eclipse",
+     1
+    ],
+    [
+     "Wages of Pain",
+     2
+    ],
+    [
+     "Imperial Decree",
+     3
+    ]
+   ]
+  },
+  {
+   "name": "Darius – Hand of Noxus · Regional Qualifier Utrecht (MICE DiamondHat)",
+   "legend": "Hand of Noxus",
+   "event": "Regional Qualifier Utrecht (MICE DiamondHat)",
+   "placement": "Top 8",
+   "date": "2026",
+   "source": "mobalytics.gg",
+   "cards": [
+    [
+     "Carrion Dredger",
+     3
+    ],
+    [
+     "Honest Broker",
+     3
+    ],
+    [
+     "Inferna",
+     2
+    ],
+    [
+     "Vanguard Captain",
+     3
+    ],
+    [
+     "Xin Zhao, Vigilant",
+     3
+    ],
+    [
+     "Noxus Hopeful",
+     3
+    ],
+    [
+     "Spectral Matron",
+     3
+    ],
+    [
+     "Safety Inspector",
+     3
+    ],
+    [
+     "Vi, Peacekeeper",
+     2
+    ],
+    [
+     "Seal of Unity",
+     2
+    ],
+    [
+     "Baited Hook",
+     3
+    ],
+    [
+     "Falling Star",
+     1
+    ],
+    [
+     "Hidden Blade",
+     3
+    ],
+    [
+     "Rally the Troops",
+     3
+    ],
+    [
+     "Shadow's Call",
+     1
+    ],
+    [
+     "Grand Strategem",
+     1
+    ]
+   ]
+  },
+  {
+   "name": "Ornn – Fire Below the Mountain · Regional Qualifier Barcelona (MICE TheManland)",
+   "legend": "Fire Below the Mountain",
+   "event": "Regional Qualifier Barcelona (MICE TheManland)",
+   "placement": "1.",
+   "date": "2026-08-23",
+   "source": "mobalytics.gg",
+   "cards": [
+    [
+     "Ornn, Blacksmith",
+     1
+    ],
+    [
+     "Seal of Focus",
+     3
+    ],
+    [
+     "Charm",
+     2
+    ],
+    [
+     "Cloth Armor",
+     1
+    ],
+    [
+     "Defy",
+     3
+    ],
+    [
+     "Poro Snax",
+     3
+    ],
+    [
+     "Brutalizer",
+     3
+    ],
+    [
+     "Clockwork Keeper",
+     3
+    ],
+    [
+     "Guardian Angel",
+     1
+    ],
+    [
+     "Mask of Foresight",
+     1
+    ],
+    [
+     "Patched Porobot",
+     3
+    ],
+    [
+     "Scuttle Crab",
+     3
+    ],
+    [
+     "Sprite Fountain",
+     3
+    ],
+    [
+     "Aspiring Engineer",
+     2
+    ],
+    [
+     "Lecturing Yordle",
+     1
+    ],
+    [
+     "Pit Crew",
+     3
+    ],
+    [
+     "Sterak's Gage",
+     3
+    ],
+    [
+     "Helm of Suppression",
+     1
+    ]
+   ]
+  },
+  {
+   "name": "Lucian – Purifier · Regional Qualifier Hartford (Kaillou)",
+   "legend": "Purifier",
+   "event": "Regional Qualifier Hartford (Kaillou)",
+   "placement": "Best-Of",
+   "date": "2026",
+   "source": "mobalytics.gg",
+   "cards": [
+    [
+     "Lucian, Merciless",
+     1
+    ],
+    [
+     "Gem Jammer",
+     3
+    ],
+    [
+     "Irresistible Faefolk",
+     3
+    ],
+    [
+     "Legion Rearguard",
+     1
+    ],
+    [
+     "First Mate",
+     2
+    ],
+    [
+     "Kinkou Initiate",
+     2
+    ],
+    [
+     "Kai'Sa, Survivor",
+     3
+    ],
+    [
+     "Noxus Hopeful",
+     2
+    ],
+    [
+     "Poppy, Paragon",
+     1
+    ],
+    [
+     "Ruin Runner",
+     2
+    ],
+    [
+     "Doran's Blade",
+     3
+    ],
+    [
+     "Long Sword",
+     3
+    ],
+    [
+     "Blighted Battleaxe",
+     3
+    ],
+    [
+     "Trinity Force",
+     1
+    ],
+    [
+     "Punch First",
+     3
+    ],
+    [
+     "Sabotage",
+     2
+    ],
+    [
+     "Challenge",
+     2
+    ],
+    [
+     "Relentless Pursuit",
+     3
+    ]
+   ]
+  },
+  {
+   "name": "Lucian – Purifier · Regional Qualifier Sydney (LockOn)",
+   "legend": "Purifier",
+   "event": "Regional Qualifier Sydney (LockOn)",
+   "placement": "Best-Of",
+   "date": "2026",
+   "source": "mobalytics.gg",
+   "cards": [
+    [
+     "Lucian, Merciless",
+     1
+    ],
+    [
+     "Gem Jammer",
+     2
+    ],
+    [
+     "Irresistible Faefolk",
+     3
+    ],
+    [
+     "First Mate",
+     3
+    ],
+    [
+     "Kinkou Initiate",
+     3
+    ],
+    [
+     "Kai'Sa, Survivor",
+     3
+    ],
+    [
+     "Ruin Runner",
+     3
+    ],
+    [
+     "Doran's Blade",
+     3
+    ],
+    [
+     "Skyfall of Areion",
+     3
+    ],
+    [
+     "Blighted Battleaxe",
+     2
+    ],
+    [
+     "Trinity Force",
+     3
+    ],
+    [
+     "Punch First",
+     2
+    ],
+    [
+     "Sabotage",
+     2
+    ],
+    [
+     "Challenge",
+     2
+    ],
+    [
+     "Confront",
+     2
+    ],
+    [
+     "Relentless Pursuit",
+     3
+    ]
+   ]
+  }
+ ]
+}

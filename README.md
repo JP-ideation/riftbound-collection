@@ -106,12 +106,14 @@ index.html            App-Gerüst
 app.css               Styles
 js/parser.js          Textformat einlesen und schreiben
 js/db.js              Kartendatenbank laden, Sammlung zuordnen
+js/banlist.js         offizielle Bannliste (Standard), Stand 18.09.2026
 js/mechanics.js       Kartenmechanik aus dem Kartentext: was eine Karte braucht und liefert
 js/deckbuilder.js     Deckgenerator, Bewertung im Deckzusammenhang, Deck-Check, Wunschliste
 js/guide.js           Spielhilfe je Deck (aus der Deckzusammensetzung)
 js/app.js             Oberfläche und Zustand
 scripts/fetch-cards.mjs   Kartendaten von Riot holen
 data/cards.json       generiert, wird täglich aktualisiert
+data/meta.json        Turnierlisten der Regional Qualifiers (von Hand gepflegt)
 sw.js                 Service Worker für Offline-Betrieb
 ```
 
@@ -137,7 +139,8 @@ Erinnerungstexte in Klammern werden dabei ignoriert – sonst gälte jede Karte 
 
 1. **Regeln** – nur Karten der Domain-Identität, keine Spielmarken (Gold, Bird-
    Token …), keine Signature-Karten fremder Champions, höchstens 3
-   Signature-Karten, mindestens eine Champion-Einheit des Legenden-Champions.
+   Signature-Karten, mindestens eine Champion-Einheit des Legenden-Champions,
+   keine gebannten Karten oder Schlachtfelder.
 2. **Motor der Legende** – der Legendentext sagt, was sie will. *Heart of the
    Tempest* (Kennen) wird aufgeladen, wenn Karten **nicht aus der Hand**
    gespielt werden; Karten, die genau das tun, bekommen einen großen Bonus mit
@@ -150,8 +153,10 @@ Erinnerungstexte in Klammern werden dabei ignoriert – sonst gälte jede Karte 
    teilen sich dieselben Quellen und werden entsprechend abgewertet.
 4. **Enabler** – was eine Karte liefert, zählt so viel, wie andere Karten im
    Deck es brauchen.
-5. **Meta** – gespeicherte Meta-Decklisten mit Legende: Karten, die in Decks
-   derselben Legende stecken, werden nach Häufigkeit bevorzugt.
+5. **Meta** – Turnierlisten derselben Legende (mitgeliefert in `data/meta.json`
+   oder im Tab „Meta-Decks“ eingefügt): Karten daraus werden nach Häufigkeit
+   und Kopienzahl stark bevorzugt, und die Kurve folgt dann der Profi-Liste.
+   Decks ohne Turnierdaten sind in der App als solche markiert.
 6. **Grundwert** – Seltenheit, Might im Vergleich zu gleich teuren Einheiten,
    Schlüsselwörter, Abzug für sehr teure Karten. Kosten­senkungen wie bei Rhasa
    („kostet 1 weniger je Karte im Ablagestapel") werden berücksichtigt.
@@ -172,8 +177,23 @@ der Legende und wie viele Karten ihn antreiben, Schlüsselkarten mit Begründung
 **Bedingungen im Deck** (jede Karte, deren Text etwas voraussetzt, mit ✓/✗),
 Mulligan, Stärken und Schwächen. Jede Aussage nennt die Zahl, auf der sie beruht.
 
+## Turnierdaten und Bannliste pflegen
+
+* **Bannliste:** `js/banlist.js`. Riot bannt in Wellen (zuletzt 31.03.,
+  24.07. und 18.09.2026). Bei jeder neuen Welle Namen und `BANNED_AS_OF`
+  anpassen; der Deckbau schließt gebannte Karten und Schlachtfelder aus, der
+  Deck-Check markiert sie.
+* **Turnierlisten:** `data/meta.json`, je Deck Legende (`fullName`), Event,
+  Platzierung, Datum, Quelle und Karten `[fullName, Kopien]`. Beim Einpflegen
+  jede Karte gegen `data/cards.json`, die Domain-Identität der Legende und die
+  Bannliste prüfen. Stand der mitgelieferten Listen: Regional Qualifiers der
+  Vendetta-Saison bis September 2026, 16 Legenden.
+
 ## Grenzen
 
+* Turnierlisten werden nicht automatisch abgerufen – die Deck-Datenbanken
+  bieten keine offene API. Die mitgelieferten Listen veralten mit jedem neuen
+  Set und jeder Bannwelle.
 * Es gibt keine offene API für Meta-Decks. Tier-Listen von riftdecks.com,
   riftbound.gg, riftools.app oder riftmana.com müssen als Deckliste eingefügt
   werden (mit Legende) – Auswertung und Einfluss auf den Deckbau passieren dann

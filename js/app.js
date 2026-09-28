@@ -2,6 +2,7 @@ import { parseCollection, serializeCollection } from './parser.js';
 import { loadCards, buildInventory, resolve, key } from './db.js';
 import { suggestDecks, deckToText, deckTitle, checkDeck, championOf, RULES } from './deckbuilder.js';
 import { buildGuide } from './guide.js';
+import { isBanned, BANNED_AS_OF } from './banlist.js';
 
 const KEY = { coll: 'rb.collection.v1', meta: 'rb.metadecks.v1', friends: 'rb.friends.v1' };
 const DOMAINS = ['calm', 'mind', 'body', 'fury', 'order', 'chaos', 'colorless'];
@@ -69,16 +70,38 @@ function parseMetaList(text) {
   const legend = rows.find(r => r.card?.type === 'legend')?.card ?? null;
   const main = rows.filter(r => r.card && ['unit', 'spell', 'gear'].includes(r.card.type))
     .map(r => ({ card: r.card, count: r.e.qty }));
-  return { legend, main };
+  const battlefields = rows.filter(r => r.card?.type === 'battlefield').map(r => r.card);
+  return { legend, main, battlefields };
 }
 
 function metaDecks() {
   // "Nur prüfen" (eigenes Deck) fließt nicht ein – sonst würde ein schwaches
   // eigenes Deck den Deckbau in seine eigene Richtung ziehen.
-  return read(KEY.meta, []).filter(d => !d.own).map(d => {
+  const own = read(KEY.meta, []).filter(d => !d.own).map(d => {
     const { legend, main } = parseMetaList(d.text);
     if (!legend) return null;
-    return { legendKey: key(legend), champion: championOf(legend, state.db.cards), cards: new Set(main.map(m => key(m.card))) };
+    return { legendKey: key(legend), champion: championOf(legend, state.db.cards), cards: countMap(main) };
+  }).filter(Boolean);
+  return [...builtinMeta(), ...own];
+}
+
+const countMap = main => {
+  const m = new Map();
+  for (const { card, count } of main) m.set(key(card), (m.get(key(card)) ?? 0) + count);
+  return m;
+};
+
+/**
+ * Mitgelieferte Turnierlisten (data/meta.json) in dieselbe Form bringen wie
+ * eingefügte Meta-Decks. Karten, die es nicht (mehr) gibt, fallen still raus.
+ */
+function builtinMeta() {
+  if (!state.meta) return [];
+  return state.meta.decks.map(d => {
+    const legend = state.db.byName.get(d.legend.toLowerCase());
+    if (!legend) return null;
+    const main = d.cards.map(([n, c]) => ({ card: state.db.byName.get(n.toLowerCase()), count: c })).filter(x => x.card);
+    return { legendKey: key(legend), champion: championOf(legend, state.db.cards), cards: countMap(main), builtin: d };
   }).filter(Boolean);
 }
 
@@ -187,13 +210,18 @@ function viewDecks() {
   return `
     <h2>Spielbare Decks</h2>
     <p class="sub">Für jede Legende in deiner Sammlung das stärkste Deck, das du <b>heute</b> legen kannst –
-       40 Karten Hauptdeck, 12 Runen, 3 Schlachtfelder, max. 3 Kopien je Karte, nur Karten in der Domain-Identität der Legende.</p>
+       40 Karten Hauptdeck, 12 Runen, 3 Schlachtfelder, max. 3 Kopien je Karte, nur Karten in der Domain-Identität der Legende,
+       Champion-Einheit Pflicht, max. 3 Signature-Karten, keine gebannten Karten
+       (Bannliste Stand ${new Date(BANNED_AS_OF).toLocaleDateString('de-DE')}).</p>
     <div class="decklist">${list.map((d, i) => `
       <button class="deckcard" data-deck="${i}">
         <div class="row" style="justify-content:space-between;align-items:flex-start">
           <div><div class="t">${esc(d.champion ?? d.legend.name)}</div>
             <div class="m">${d.champion ? esc(d.legend.name) + ' · ' : ''}${dots(d.identity)} ${d.identity.join(' + ')}</div></div>
-          <span class="badge ${d.complete ? 'ok' : 'warn'}">${d.complete ? 'komplett' : 'unvollständig'}</span>
+          <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end">
+            <span class="badge ${d.complete ? 'ok' : 'warn'}">${d.complete ? 'komplett' : 'unvollständig'}</span>
+            <span class="badge ${d.metaDecks ? 'ok' : 'bad'}">${d.metaDecks ? 'Turnierdaten' : 'ohne Turnierdaten'}</span>
+          </div>
         </div>
         <div class="m" style="margin-top:10px">
           Deckwert <b style="color:var(--accent)">${d.score}</b> ·
@@ -216,6 +244,9 @@ function viewDeckDetail(d) {
       ${d.hasChampion ? '' : ` · <b>keine Champion-Einheit von ${esc(d.champion)} im Bestand</b> (Pflicht)`}
       ${d.metaDecks ? ` · berücksichtigt ${d.metaDecks} Meta-Deck${d.metaDecks === 1 ? '' : 's'} dieser Legende` : ''}</p>
 
+    ${d.metaDecks ? '' : `<div class="notice" style="margin-bottom:16px"><b>Ohne Turnierdaten gebaut.</b> Für diese Legende liegt keine
+      Profi-Liste vor – das Deck folgt nur den Kartentexten (Regeln, Motor, Bedingungen). Das ergibt ein spielbares, aber kein
+      turniererprobtes Deck. Füge im Tab „Meta-Decks“ eine aktuelle Turnierliste dieser Legende ein, dann baut die App danach.</div>`}
     ${guideBlock(d)}
 
     <div class="cols">
@@ -336,6 +367,8 @@ function viewMeta() {
       <textarea id="metaText" placeholder="Deckliste einfügen – gleiches Format wie der Sammlungs-Export"></textarea>
       <div class="row" style="margin-top:12px"><button class="btn primary" id="addMeta">Deck speichern &amp; auswerten</button></div>
     </div>
+    ${builtinBlock()}
+    <h3>Eigene Listen</h3>
     ${analyses.length ? analyses.map((d, i) => {
       const cls = d.a.pct >= 95 ? 'ok' : d.a.pct >= 75 ? 'warn' : 'bad';
       const miss = d.a.rows.filter(r => r.missing > 0);
@@ -357,14 +390,51 @@ function viewMeta() {
     }).join('') : '<div class="empty">Noch keine Meta-Decks gespeichert.</div>'}`;
 }
 
+/**
+ * Mitgelieferte Turnierlisten: wie viel davon besitzt du? Sortiert nach
+ * Vollständigkeit – das Profi-Deck, das du am ehesten bauen kannst, steht oben.
+ */
+function builtinBlock() {
+  const list = builtinMeta().map(m => {
+    const rows = [...m.cards].map(([k, need]) => {
+      const card = state.db.byName.get(k);
+      const have = Math.min(need, state.inv.owned.get(k)?.qty ?? 0);
+      return { card, need, have, missing: need - have };
+    });
+    const legendOwned = state.inv.owned.has(m.legendKey);
+    const need = rows.reduce((s, r) => s + r.need, 0), have = rows.reduce((s, r) => s + r.have, 0);
+    return { m, rows, legendOwned, need, have, pct: pct(have, need) };
+  }).sort((a, b) => b.legendOwned - a.legendOwned || b.pct - a.pct);
+  if (!list.length) return '';
+  return `<h3>Turnierlisten · Regional Qualifiers ${esc(state.meta.updated?.slice(0, 7) ?? '')}</h3>
+    <p class="sub">${esc(state.meta.note ?? '')} Diese Listen fließen automatisch in den Deckbau der jeweiligen Legende ein.</p>
+    ${list.map(x => {
+      const b = x.m.builtin, cls = x.pct >= 95 ? 'ok' : x.pct >= 75 ? 'warn' : 'bad';
+      const miss = x.rows.filter(r => r.missing > 0);
+      return `<details class="card" style="margin-bottom:10px">
+        <summary class="row" style="justify-content:space-between;cursor:pointer">
+          <div><b>${esc(b.name)}</b>
+            <div class="m" style="font-size:12px;color:var(--dim)">${esc(b.placement)} · ${esc(b.date)} · ${esc(b.source)} ·
+              ${x.have}/${x.need} Karten vorhanden${x.legendOwned ? '' : ' · <b>Legende fehlt dir</b>'}</div></div>
+          <span class="badge ${cls}">${x.pct}%</span>
+        </summary>
+        <div class="lines" style="margin-top:10px">${x.rows.map(r => `<div class="line ${r.missing ? 'missing' : ''}">
+          <span class="c">${r.need}×</span><span class="n">${esc(cname(r.card))}${r.missing ? ` <small class="warn">fehlt ${r.missing}×</small>` : ''}</span>
+          <span class="e">${ident(r.card)}</span></div>`).join('')}</div>
+        ${miss.length ? '' : '<div class="notice" style="margin-top:10px">Alle gelisteten Karten vorhanden.</div>'}
+      </details>`;
+    }).join('')}`;
+}
+
 /** Deck-Check einer eingefügten Liste: unspielbare Karten, Motor der Legende. */
 function metaCheck(text, own) {
-  const { legend, main } = parseMetaList(text);
+  const { legend, main, battlefields } = parseMetaList(text);
   if (!legend) return `<p class="sub" style="margin:10px 0 0">Keine Legende in der Liste erkannt – für Deck-Check und Deckbau
     muss die Legende mit in der Liste stehen.</p>`;
   const r = checkDeck(legend, main, state.db.cards);
   const engine = r.engine.map(e => `<div class="line" style="display:block"><b>Motor: ${esc(e.text)}</b><br>
     <span class="e">${String(e.have).replace('.', ',')} im Deck (${esc(e.label)}) – ${e.sat >= 0.8 ? 'läuft zuverlässig' : e.sat >= 0.4 ? 'läuft teilweise' : 'zu wenig'}</span></div>`).join('');
+  for (const b of battlefields) if (isBanned(b)) r.problems.push({ card: b, count: 1, text: 'Gebanntes Schlachtfeld – im Turnier (Standard) nicht erlaubt' });
   const probs = r.problems.map(p => `<div class="line missing" style="display:block"><b>${p.count}× ${esc(cname(p.card))}</b><br>
     <span class="e">${esc(p.text)}</span></div>`).join('');
   return `<h3>Deck-Check · ${esc(legend.fullName ?? legend.name)} <span class="tag">${own ? 'nur geprüft' : 'fließt in den Deckbau ein'}</span></h3>
@@ -525,6 +595,8 @@ document.addEventListener('change', e => {
 /* -------------------------------------------------------------------- Start */
 (async () => {
   state.db = await loadCards();
+  // Turnierlisten sind optional: fehlt die Datei, baut die App ohne Meta-Daten.
+  state.meta = await fetch('data/meta.json', { cache: 'no-cache' }).then(r => (r.ok ? r.json() : null)).catch(() => null);
   state.inv = { owned: new Map() };
   const saved = read(KEY.coll, null);
   if (saved) applyCollection(saved, false);

@@ -7,6 +7,7 @@
  *   Karten müssen in der Domain-Identität der Legende liegen (+ farblos).
  *   Mindestens eine Champion-Einheit des Legenden-Champions (Chosen Champion).
  *   Signature-Karten nur vom eigenen Champion, höchstens 3 insgesamt.
+ *   Keine gebannten Karten und Schlachtfelder (banlist.js).
  *
  * Bewertet wird nicht die Einzelkarte, sondern die Karte IN DIESEM DECK:
  * Was sie braucht (XP, Stammesfutter, Zauber …) muss das Deck liefern, sonst
@@ -15,13 +16,16 @@
  * der Motor der Legende und, falls vorhanden, die Häufigkeit in Meta-Decks.
  */
 import { initMechanics, analyze, satisfaction, needFeatures, MANDATORY_MIN, featureLabel, effectiveEnergy } from './mechanics.js';
+import { isBanned } from './banlist.js';
 
 /** Identitaetsschluessel: Name + Beiname, siehe db.js. */
 export const key = c => (c.fullName ?? c.name).toLowerCase();
 
 export const RULES = { MAIN: 40, RUNES: 12, BATTLEFIELDS: 3, MAX_COPIES: 3, SIGNATURES: 3 };
 
-const RARITY_SCORE = { common: 1, uncommon: 2, rare: 3.5, epic: 5, showcase: 3.5 };
+// Seltenheit nur als schwaches Signal: Turnierdecks bestehen zu großen Teilen
+// aus Commons (Defy, Charm, Punch First) – Seltenheit ist kein Stärkemaß.
+const RARITY_SCORE = { common: 1, uncommon: 1.5, rare: 2.2, epic: 3, showcase: 2.2 };
 const MAIN_TYPES = new Set(['unit', 'spell', 'gear']);
 
 /** Ausgangskurve für 40 Karten – summiert exakt auf 40. Gewichtet 70 %. */
@@ -60,10 +64,13 @@ function wishOf(scored, fn, init) {
  * Zielkurve: überwiegend Ausgangskurve, zu 30 % Wunschkurve des Pools – so
  * bleibt die Kurve gesund, unterscheidet sich aber je nach Pool.
  */
-function targetCurve(scored) {
+function targetCurve(scored, trustPool = false) {
   const wish = wishOf(scored, slot, { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 });
+  // Mit Turnierdaten stammt die Wunschkurve aus echten Profi-Listen – dann
+  // gilt sie weitgehend, statt von der Ausgangskurve verwässert zu werden.
+  const w = trustPool ? 0.8 : 0.3;
   const out = {};
-  for (const b of [1, 2, 3, 4, 5, 6]) out[b] = Math.round(wish[b] * 0.3 + CURVE[b] * 0.7);
+  for (const b of [1, 2, 3, 4, 5, 6]) out[b] = Math.round(wish[b] * w + CURVE[b] * (1 - w));
   return balance(out, ['1', '2', '3', '4', '5', '6']);
 }
 
@@ -72,7 +79,7 @@ function targetCurve(scored) {
  * Typen druckt (rund 63/26/11), halb das, was der Pool hergeben würde.
  * Ohne Gegengewicht entstünden Decks aus 38 Einheiten und einem Zauber.
  */
-function targetTypes(scored, allCards) {
+function targetTypes(scored, allCards, trustPool = false) {
   const printed = { unit: 0, spell: 0, gear: 0 };
   for (const c of canonical(allCards)) {
     if (c.rarity !== 'showcase' && printed[c.type] !== undefined) printed[c.type]++;
@@ -81,8 +88,9 @@ function targetTypes(scored, allCards) {
   const wish = wishOf(scored, c => c.type, { unit: 0, spell: 0, gear: 0 });
   const wishTotal = wish.unit + wish.spell + wish.gear || 1;
   const out = {};
+  const w = trustPool ? 0.8 : 0.5;
   for (const t of ['unit', 'spell', 'gear']) {
-    out[t] = Math.round(((printed[t] / printedTotal) + (wish[t] / wishTotal)) / 2 * RULES.MAIN);
+    out[t] = Math.round(((printed[t] / printedTotal) * (1 - w) + (wish[t] / wishTotal) * w) * RULES.MAIN);
   }
   return balance(out, ['unit', 'spell', 'gear']);
 }
@@ -92,8 +100,15 @@ const KEYWORDS = [
   [/\bdraw\b/i, 2.5], [/\bkill\b/i, 2], [/deals? \d/i, 2], [/\[Stun\]|\bstun\b/i, 1.5],
   [/\bready\b/i, 1], [/\bbuff\b/i, 1], [/costs? .*less/i, 1.5], [/\[Deflect/i, 1],
   [/\[Ganking\]/i, 1], [/\[Ambush\]|\[Hidden\]/i, 1],
-  // Kartenauswahl ist fast so gut wie Nachziehen (Stacked Deck, Called Shot)
+  // Kartenauswahl ist fast so gut wie Nachziehen
   [/into your hand|draw (?:it|one)\b/i, 2],
+  // Interaktion – das Rückgrat von Turnierdecks
+  [/\[Reaction\]/, 1.5],                                  // zu jeder Zeit spielbar
+  [/\bcounter a spell/i, 3],                               // Defy
+  [/move an enemy unit|move [^.]*enemy unit/i, 2.5],        // Charm: Schlachtfeld freiräumen
+  [/\+\d+ Might this turn|\[Assault \d\] this turn/i, 1.5], // Kampftrick
+  [/reveal their hand|reveals their hand/i, 1.5],          // Handstörung
+  [/can't be chosen by enemy/i, 1.5],
 ];
 
 /**
@@ -139,6 +154,9 @@ function baseScore(card, baseline) {
   // Hand – ohne diesen Abzug gewinnen 8–12er allein über ihre Might.
   const eff = effectiveEnergy(card) ?? 0;
   if (eff > 5) s -= (eff - 5) * 0.9;
+  // Effizienz: Günstige Karten halten das Tempo und passen in jeden Zug.
+  // Profi-Listen spielen 12–18 Karten für 1–2 Energie.
+  if (card.energy != null && eff <= 2) s += eff <= 1 ? 2 : 1.5;
   const real = (card.domains ?? []).filter(d => d !== 'colorless');
   if (real.length === 1) s += 1;                 // einfarbig = leichter zu bezahlen
   return s;
@@ -295,18 +313,28 @@ const fmt = x => (Math.round(x * 10) / 10).toString().replace('.', ',');
 const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
 
 /**
- * Meta-Häufigkeit je Karte für eine Legende.
- * metaDecks: [{ legendKey, champion, cards: Set<key> }]
- * Gezählt werden Decks derselben Legende, ersatzweise desselben Champions.
+ * Meta-Gewicht je Karte für eine Legende.
+ * metaDecks: [{ legendKey, champion, cards: Map<key, Kopien> }]
+ * Gezählt werden nur Decks derselben Legende.
+ * freq berücksichtigt die Kopienzahl: ein 3er-Kernstück wiegt voll, eine
+ * einzelne Tech-Karte ein Drittel.
  */
-function metaIndex(metaDecks, legend, champion) {
-  const same = metaDecks.filter(d => d.legendKey === key(legend));
-  const pool = same.length ? same : metaDecks.filter(d => champion && d.champion === champion);
+function metaIndex(metaDecks, legend) {
+  // Nur Listen derselben Legende: Zwei Legenden desselben Champions haben
+  // verschiedene Motoren (Wuju Bladesman ≠ Wuju Master).
+  const pool = metaDecks.filter(d => d.legendKey === key(legend));
   const out = new Map();
   if (!pool.length) return out;
-  const n = new Map();
-  for (const d of pool) for (const k of d.cards) n.set(k, (n.get(k) ?? 0) + 1);
-  for (const [k, hits] of n) out.set(k, { hits, of: pool.length, freq: hits / pool.length });
+  const hits = new Map(), copies = new Map();
+  for (const d of pool) {
+    for (const [k, n] of d.cards) {
+      hits.set(k, (hits.get(k) ?? 0) + 1);
+      copies.set(k, (copies.get(k) ?? 0) + Math.min(n, RULES.MAX_COPIES));
+    }
+  }
+  for (const [k, h] of hits) {
+    out.set(k, { hits: h, of: pool.length, freq: Math.min(1, (0.4 + 0.6 * copies.get(k) / (RULES.MAX_COPIES * pool.length))) * h / pool.length });
+  }
   return out;
 }
 
@@ -322,7 +350,7 @@ export function buildDeck(inventory, legendEntry, allCards, metaDecks = []) {
 
   const owned = [...inventory.owned.values()];
   // Fremde Signature-Karten sind in diesem Deck schlicht nicht erlaubt.
-  const legal = c => MAIN_TYPES.has(c.type) && !isToken(c) && inIdentity(c, identity)
+  const legal = c => MAIN_TYPES.has(c.type) && !isToken(c) && !isBanned(c) && inIdentity(c, identity)
     && (() => { const sig = signatureOf(c, names); return !sig || sig === champion; })();
   const pool = owned.filter(o => legal(o.card));
 
@@ -331,7 +359,7 @@ export function buildDeck(inventory, legendEntry, allCards, metaDecks = []) {
     baseline, names, champion,
     base: new Map(pool.map(o => [key(o.card), baseScore(o.card, baseline)])),
     legendNeeds: analyze(legend).needs,
-    meta: metaIndex(metaDecks, legend, champion),
+    meta: metaIndex(metaDecks, legend),
   };
 
   // Iterativ: bewerten → Deck bauen → mit dem neuen Deck neu bewerten.
@@ -343,7 +371,7 @@ export function buildDeck(inventory, legendEntry, allCards, metaDecks = []) {
     const scored = pool
       .map(o => ({ ...o, score: contextScore(o.card, env, ctx, Math.min(o.qty, 2)).score }))
       .sort((a, b) => b.score - a.score || (a.card.energy ?? 0) - (b.card.energy ?? 0));
-    const main = assemble(scored, allCards, names, champion);
+    const main = assemble(scored, allCards, names, champion, env.meta.size > 0);
     const deckCtx = contextOf(main, legend);
     const value = evaluate(main, env, deckCtx);
     if (!best || value > best.value) best = { main, value, ctx: deckCtx };
@@ -367,11 +395,7 @@ export function buildDeck(inventory, legendEntry, allCards, metaDecks = []) {
   const runeCount = runes.reduce((s, r) => s + r.count, 0);
 
   // --- Schlachtfelder: 3 verschiedene Namen ---
-  const battlefields = owned
-    .filter(o => o.card.type === 'battlefield' && !isToken(o.card))
-    .map(o => ({ card: o.card, count: 1, score: (RARITY_SCORE[o.card.rarity] ?? 1) + ((o.card.text?.length ?? 0) / 120) }))
-    .sort((a, b) => b.score - a.score)
-    .slice(0, RULES.BATTLEFIELDS);
+  const battlefields = pickBattlefields(owned, finalCtx);
 
   const curve = {};
   for (const { card, count } of main) curve[bucket(card.energy)] = (curve[bucket(card.energy)] ?? 0) + count;
@@ -426,11 +450,11 @@ function evaluate(main, env, ctx) {
  * Hauptdeck füllen: Champion zuerst, dann kurvenbewusst nach Score, danach
  * Restauffüllung. Unspielbare Karten kommen nie hinein.
  */
-function assemble(scored, allCards, names, champion) {
+function assemble(scored, allCards, names, champion, trustPool = false) {
   const main = [];
   const used = new Map();
-  const buckets = targetCurve(scored);
-  const typeSlots = targetTypes(scored, allCards);
+  const buckets = targetCurve(scored, trustPool);
+  const typeSlots = targetTypes(scored, allCards, trustPool);
   let total = 0, signatures = 0;
 
   const take = (entry, respectQuota, limit = RULES.MAX_COPIES) => {
@@ -463,6 +487,32 @@ function assemble(scored, allCards, names, champion) {
   for (const e of scored) { if (total >= RULES.MAIN) break; take(e, true); }
   for (const e of scored) { if (total >= RULES.MAIN) break; take(e, false); }
   return main;
+}
+
+/**
+ * Schlachtfelder: legal (nicht gebannt, keine Spielmarke), 3 verschiedene
+ * Namen, und passend zum Deck – ein Schlachtfeld, das Zauber belohnt, gehört
+ * in ein Zauberdeck, nicht in eines mit sechs Zaubern.
+ */
+function pickBattlefields(owned, ctx) {
+  const seen = new Set();
+  return owned
+    .filter(o => o.card.type === 'battlefield' && !isToken(o.card) && !isBanned(o.card))
+    .map(o => {
+      const a = analyze(o.card);
+      let score = (RARITY_SCORE[o.card.rarity] ?? 1) * 0.5;
+      for (const [re, w] of KEYWORDS) if (re.test(o.card.text ?? '')) score += w * 0.5;
+      for (const n of a.needs) {
+        const have = needFeatures(n).reduce((x, f) => x + (ctx.provides.get(f) ?? 0), 0);
+        const sat = satisfaction(n, have);
+        score += n.weight * (sat - 0.5);
+      }
+      for (const [f, w] of a.provides) score += Math.min(3, (ctx.demand.get(f) ?? 0) * 0.08) * Math.min(1, w);
+      return { card: o.card, count: 1, score };
+    })
+    .sort((a, b) => b.score - a.score)
+    .filter(b => !seen.has(key(b.card)) && seen.add(key(b.card)))
+    .slice(0, RULES.BATTLEFIELDS);
 }
 
 /** Runen im Verhältnis des tatsächlichen Domain-Bedarfs des Hauptdecks. */
@@ -545,6 +595,7 @@ export function checkDeck(legend, main, allCards) {
     const sig = signatureOf(m.card, names);
     if (sig && champion && sig !== champion) problems.push({ card: m.card, count: m.count, text: `Signature-Karte von ${sig} – in einem ${champion}-Deck nicht erlaubt` });
     if (isToken(m.card)) { problems.push({ card: m.card, count: m.count, text: 'Spielmarke – entsteht im Spiel und gehört nicht ins Deck' }); continue; }
+    if (isBanned(m.card)) { problems.push({ card: m.card, count: m.count, text: 'Gebannt – im Turnier (Standard) nicht erlaubt' }); continue; }
     const r = contextScore(m.card, env, ctx, m.count);
     for (const w of r.why) if (w.ok === false && (w.sat ?? 0) < 0.5) problems.push({ card: m.card, count: m.count, text: w.text });
   }
@@ -607,4 +658,3 @@ export function deckToText(deck) {
   return `// ${deckTitle(deck)}\n// Legende\n${line(1, deck.legend)}`
     + sec('Hauptdeck', deck.main) + sec('Runen', deck.runes) + sec('Schlachtfelder', deck.battlefields) + '\n';
 }
-
