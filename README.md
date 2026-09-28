@@ -13,9 +13,9 @@ Datenbank – die Sammlung bleibt im Browser des jeweiligen Geräts.
 | Bereich | Funktion |
 | --- | --- |
 | **Sammlung** | Import per Textdatei, Abgleich mit der offiziellen Kartendatenbank, Filter nach Set, Domain, Typ, Seltenheit und Kartentext |
-| **Decks** | Für **jede** Legende im Bestand das stärkste legale Deck: 40 Karten Hauptdeck, 12 Runen, 3 Schlachtfelder, max. 3 Kopien, Domain-Identität der Legende. Mit Energiekurve, Deckwert und Spielhilfe |
+| **Decks** | Für **jede** Legende im Bestand das stärkste legale Deck – **ausschließlich aus eigenen Karten**, sortiert nach Bewertung. Dazu je Deck der „Weg zur Turnierliste“: was dir zur Profi-Liste dieser Legende fehlt |
 | **Meta-Decks** | Beliebige Deckliste einfügen → Vollständigkeit in Prozent, fehlende Karten und Deck-Check (unspielbare Karten, unerfüllte Bedingungen). Meta-Listen mit Legende fließen in den Deckbau ein |
-| **Wunschliste** | Bündelt alles Fehlende; Karten, die in mehreren Decks gebraucht werden, stehen oben |
+| **Wunschliste** | Ausbauziele: was dir zu Turnierlisten deiner Legenden fehlt; Karten, die mehrere Listen brauchen, stehen oben |
 | **Teilen** | Sammlung exportieren, Sammlungen von Freunden einfügen und beidseitig abgleichen |
 
 ## Kartendaten
@@ -167,8 +167,13 @@ fliegen gemeinsam raus; das beste Ergebnis gewinnt. Kurve (70 % feste
 Ausgangskurve, 30 % Pool) und Typmischung (halb Druckverhältnis, halb Pool)
 halten das Deck spielbar. Runen werden nach Domain-Bedarf verteilt.
 
-Die **Wunschliste** hält den kompletten offiziellen Kartenpool der Identität
-gegen das fertige Deck – bewertet im Kontext dieses Decks.
+**Rangfolge:** Bewertung = Stärke der Karten im Zusammenspiel (ohne
+Meta-Bonus, damit Legenden vergleichbar sind) + Bonus für den Anteil einer
+Turnierliste, den das Deck bereits umsetzt. Gebaut wird immer nur aus dem
+Bestand; Turnierlisten zeigen, welche eigenen Karten zusammen funktionieren.
+
+**Ausbauziele** (Deckansicht „Weg zur Turnierliste“, Wunschliste, Meta-Tab)
+zeigen, was zur Profi-Liste fehlt – getrennt vom spielbaren Deck.
 
 ## Spielhilfe
 

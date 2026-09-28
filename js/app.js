@@ -80,7 +80,7 @@ function metaDecks() {
   const own = read(KEY.meta, []).filter(d => !d.own).map(d => {
     const { legend, main } = parseMetaList(d.text);
     if (!legend) return null;
-    return { legendKey: key(legend), champion: championOf(legend, state.db.cards), cards: countMap(main) };
+    return { name: d.name, legendKey: key(legend), champion: championOf(legend, state.db.cards), cards: countMap(main) };
   }).filter(Boolean);
   return [...builtinMeta(), ...own];
 }
@@ -101,7 +101,7 @@ function builtinMeta() {
     const legend = state.db.byName.get(d.legend.toLowerCase());
     if (!legend) return null;
     const main = d.cards.map(([n, c]) => ({ card: state.db.byName.get(n.toLowerCase()), count: c })).filter(x => x.card);
-    return { legendKey: key(legend), champion: championOf(legend, state.db.cards), cards: countMap(main), builtin: d };
+    return { name: d.name, legendKey: key(legend), champion: championOf(legend, state.db.cards), cards: countMap(main), builtin: d };
   }).filter(Boolean);
 }
 
@@ -208,23 +208,28 @@ function viewDecks() {
   if (!list.length) return `<h2>Decks</h2><div class="empty">Keine Legende in der Sammlung – ohne Legende lässt sich kein Deck bauen.</div>`;
 
   return `
-    <h2>Spielbare Decks</h2>
-    <p class="sub">Für jede Legende in deiner Sammlung das stärkste Deck, das du <b>heute</b> legen kannst –
+    <h2>Deine besten Decks</h2>
+    <p class="sub"><b>Ausschließlich aus Karten, die du besitzt</b> – nichts muss nachgekauft werden. Sortiert nach Stärke:
+       das beste Deck, das du heute legen kannst, steht oben. Turnierlisten dienen dabei als Vorbild, welche deiner
+       Karten zusammen funktionieren.<br><b>Bewertung</b> = Stärke der Karten im Zusammenspiel (Motor der Legende, erfüllte
+       Bedingungen, Kurve) plus Bonus für jeden Teil einer Turnierliste, den dein Deck schon umsetzt.<br>Je Legende das stärkste legale Deck –
        40 Karten Hauptdeck, 12 Runen, 3 Schlachtfelder, max. 3 Kopien je Karte, nur Karten in der Domain-Identität der Legende,
        Champion-Einheit Pflicht, max. 3 Signature-Karten, keine gebannten Karten
        (Bannliste Stand ${new Date(BANNED_AS_OF).toLocaleDateString('de-DE')}).</p>
     <div class="decklist">${list.map((d, i) => `
-      <button class="deckcard" data-deck="${i}">
+      <button class="deckcard" data-deck="${i}" ${i === 0 && d.complete ? 'style="border-color:var(--accent)"' : ''}>
+        ${i === 0 && d.complete ? '<div class="m" style="color:var(--accent);font-weight:700;margin-bottom:6px">★ Dein stärkstes Deck</div>' : ''}
         <div class="row" style="justify-content:space-between;align-items:flex-start">
           <div><div class="t">${esc(d.champion ?? d.legend.name)}</div>
             <div class="m">${d.champion ? esc(d.legend.name) + ' · ' : ''}${dots(d.identity)} ${d.identity.join(' + ')}</div></div>
           <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end">
             <span class="badge ${d.complete ? 'ok' : 'warn'}">${d.complete ? 'komplett' : 'unvollständig'}</span>
-            <span class="badge ${d.metaDecks ? 'ok' : 'bad'}">${d.metaDecks ? 'Turnierdaten' : 'ohne Turnierdaten'}</span>
+            ${d.metaRef ? `<span class="badge ${d.metaRef.coverage >= 0.75 ? 'ok' : 'warn'}">Turnierliste ${pct(d.metaRef.coverage, 1)}%</span>`
+              : '<span class="badge bad">ohne Turnierliste</span>'}
           </div>
         </div>
         <div class="m" style="margin-top:10px">
-          Deckwert <b style="color:var(--accent)">${d.score}</b> ·
+          Bewertung <b style="color:var(--accent)">${(Math.round(d.rating * 10) / 10).toString().replace('.', ',')}</b> ·
           Ø ${d.avgEnergy} Energie · ${d.counts.main}/40 · ${d.counts.runes}/12 Runen · ${d.counts.battlefields}/3 BF
         </div>
         <div class="bar-track"><div class="bar-fill ${d.complete ? '' : 'warn'}" style="width:${pct(d.counts.main, 40)}%"></div></div>
@@ -239,14 +244,14 @@ function viewDeckDetail(d) {
   return `
     <div class="row" style="margin-bottom:14px"><button class="btn sm" id="backDecks">← Alle Decks</button></div>
     <h2>${esc(deckTitle(d))} <span class="badge ${d.complete ? 'ok' : 'warn'}">${d.complete ? 'komplett spielbar' : 'unvollständig'}</span></h2>
-    <p class="sub">${dots(d.identity)} ${d.identity.join(' + ')} · Deckwert ${d.score} · Ø ${d.avgEnergy} Energie
+    <p class="sub">${dots(d.identity)} ${d.identity.join(' + ')} · Bewertung ${(Math.round(d.rating * 10) / 10).toString().replace('.', ',')} (Stärke ${String(d.score).replace('.', ',')}) · Ø ${d.avgEnergy} Energie · nur Karten aus deinem Bestand
       ${d.complete ? '' : ` · es fehlen ${d.missingSlots.main} Hauptdeck-, ${d.missingSlots.runes} Runen- und ${d.missingSlots.battlefields} Schlachtfeldkarten`}
       ${d.hasChampion ? '' : ` · <b>keine Champion-Einheit von ${esc(d.champion)} im Bestand</b> (Pflicht)`}
-      ${d.metaDecks ? ` · berücksichtigt ${d.metaDecks} Meta-Deck${d.metaDecks === 1 ? '' : 's'} dieser Legende` : ''}</p>
+      ${d.metaRef ? ` · setzt ${pct(d.metaRef.coverage, 1)}% der Turnierliste um` : ''}</p>
 
-    ${d.metaDecks ? '' : `<div class="notice" style="margin-bottom:16px"><b>Ohne Turnierdaten gebaut.</b> Für diese Legende liegt keine
-      Profi-Liste vor – das Deck folgt nur den Kartentexten (Regeln, Motor, Bedingungen). Das ergibt ein spielbares, aber kein
-      turniererprobtes Deck. Füge im Tab „Meta-Decks“ eine aktuelle Turnierliste dieser Legende ein, dann baut die App danach.</div>`}
+    ${d.metaRef ? '' : `<div class="notice" style="margin-bottom:16px"><b>Ohne Turnierliste gebaut.</b> Für diese Legende liegt keine
+      Profi-Liste vor – das Deck folgt nur den Kartentexten (Regeln, Motor, Bedingungen). Spielbar, aber nicht turniererprobt.
+      Mit einer eingefügten Turnierliste (Tab „Meta-Decks“) wählt die App aus deinen Karten gezielter aus.</div>`}
     ${guideBlock(d)}
 
     <div class="cols">
@@ -262,19 +267,29 @@ function viewDeckDetail(d) {
         <div class="lines">${d.runes.map(m => lineRow(m.count, m.card)).join('')}</div>
         <h3>Schlachtfelder · ${d.counts.battlefields}/3</h3>
         <div class="lines">${d.battlefields.map(m => lineRow(1, m.card)).join('')}</div>
-        <div class="wishbox">
-          <h3 class="wishhead">Diese Karten besitzt du NICHT</h3>
-          <p class="sub" style="margin:0 0 10px">Sie stecken nicht im Deck oben – sie würden es verbessern, wenn du sie dir zulegst.</p>
-          <div class="lines">${d.upgrades.slice(0, 12).map(u =>
-            `<div class="line missing"><span class="c">fehlt ${u.missing}×</span><span class="n">${esc(cname(u.card))}</span>
-             <span class="e">${ident(u.card)}${u.ownedQty ? ` · du hast ${u.ownedQty}` : ' · du hast 0'}</span></div>`).join('')
-            || '<div class="line">Nichts Offensichtliches – dein Pool ist für diese Legende ausgereizt.</div>'}</div>
-        </div>
+        ${pathBlock(d)}
         <div class="row" style="margin-top:14px">
           <button class="btn" id="copyDeck">Deckliste kopieren</button>
         </div>
       </div>
     </div>`;
+}
+
+/**
+ * Ausbauziel: Was fehlt dir zur Turnierliste dieser Legende? Das Deck oben
+ * ist davon unabhängig – es ist schon jetzt komplett aus deinem Bestand.
+ */
+function pathBlock(d) {
+  const m = d.metaRef;
+  if (!m) return '';
+  return `<div class="wishbox">
+    <h3 class="wishhead">Weg zur Turnierliste</h3>
+    <p class="sub" style="margin:0 0 10px">Ausbauziel, kein Muss: Dein Deck oben ist schon spielbar. Vorbild ist
+      <b>${esc(m.name)}</b> – davon besitzt du ${pct(m.owned, 1)}%${m.missing.length ? `, es fehlen ${m.missing.reduce((s, x) => s + x.missing, 0)} Karten` : ''}.</p>
+    <div class="lines">${m.missing.map(x => `<div class="line missing"><span class="c">fehlt ${x.missing}×</span>
+      <span class="n">${esc(cname(x.card))}</span><span class="e">${ident(x.card)} · du hast ${x.have}</span></div>`).join('')
+      || '<div class="line">Du besitzt alle Karten dieser Liste.</div>'}</div>
+  </div>`;
 }
 
 /* --- Spielhilfe --- */
@@ -443,27 +458,34 @@ function metaCheck(text, own) {
 
 /* --- Wunschliste --- */
 function viewWunsch() {
+  // Ausbauziele: nur, was dir zu Turnierlisten fehlt. Deine Decks selbst
+  // brauchen nichts davon – sie bestehen komplett aus deinem Bestand.
   const want = new Map();
   const add = (card, n, why) => {
     if (!card) return;
     const h = want.get(key(card)) ?? { card, n: 0, why: new Set() };
     h.n = Math.max(h.n, n); h.why.add(why); want.set(key(card), h);
   };
-
-  for (const d of read(KEY.meta, [])) {
-    const a = analyzeDeck(d.text);
-    a.rows.filter(r => r.missing > 0).forEach(r => add(r.card, r.missing, d.name));
+  const owned = new Set([...state.inv.owned.values()].filter(o => o.card.type === 'legend').map(o => key(o.card)));
+  for (const m of metaDecks()) {
+    // Nur Listen zu Legenden, die du hast – eine fehlende Legende ist kein Ausbau, sondern ein neues Deck.
+    if (!owned.has(m.legendKey)) continue;
+    const label = m.champion ?? m.name;
+    for (const [k, need] of m.cards) {
+      const card = state.db.byName.get(k);
+      if (!card || isBanned(card)) continue;
+      const have = state.inv.owned.get(k)?.qty ?? 0;
+      if (have < need) add(card, need - have, label);
+    }
   }
-  const top = decks().slice(0, 3);
-  top.forEach(d => d.upgrades.slice(0, 12).forEach(u => add(u.card, u.missing, d.champion ?? d.legend.name)));
 
   const list = [...want.values()].sort((a, b) => b.why.size - a.why.size || b.n - a.n);
   const totalCards = list.reduce((s, x) => s + x.n, 0);
 
   return `
     <h2>Wunschliste</h2>
-    <p class="sub">Alles, was dir zu deinen gespeicherten Meta-Decks und zu deinen drei stärksten eigenen Decks fehlt –
-       Karten, die in mehreren Decks gebraucht werden, stehen oben.</p>
+    <p class="sub">Ausbauziele: Karten, die dir zu Turnierlisten deiner Legenden fehlen. Deine Decks im Tab „Decks“
+       brauchen davon nichts – das hier ist nur der Weg Richtung Profi-Liste. Karten, die mehrere Listen brauchen, stehen oben.</p>
     <div class="grid-stats">${kpi(list.length, 'verschiedene Karten')}${kpi(totalCards, 'Exemplare')}
       ${kpi(list.filter(x => x.why.size > 1).length, 'mehrfach gebraucht')}</div>
     ${list.length ? `<div class="lines">${list.map(x => `<div class="line missing">
@@ -471,7 +493,7 @@ function viewWunsch() {
         <span class="tag" style="margin-left:6px">${[...x.why].slice(0, 3).map(esc).join(', ')}${x.why.size > 3 ? ' +' + (x.why.size - 3) : ''}</span></span>
         <span class="e">${ident(x.card)}</span></div>`).join('')}</div>
       <div class="row" style="margin-top:14px"><button class="btn" id="copyWish">Als Liste kopieren</button></div>`
-    : '<div class="empty">Nichts offen. Speicher ein Meta-Deck, um eine Wunschliste zu bekommen.</div>'}`;
+    : '<div class="empty">Nichts offen – oder für deine Legenden liegen keine Turnierlisten vor.</div>'}`;
 }
 
 /* --- Teilen / Freunde --- */

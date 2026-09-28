@@ -404,6 +404,16 @@ export function buildDeck(inventory, legendEntry, allCards, metaDecks = []) {
   const complete = total === RULES.MAIN && runeCount === RULES.RUNES
     && battlefields.length === RULES.BATTLEFIELDS && hasChampion;
 
+  // Stärke OHNE Meta-Bonus: nur so sind Decks verschiedener Legenden
+  // vergleichbar. Sonst stünde jede Legende mit Turnierdaten automatisch oben,
+  // auch wenn du für eine andere das bessere Deck besitzt.
+  const strength = evaluate(main, { ...env, meta: new Map() }, finalCtx);
+  const metaRef = metaMatch(metaDecks, legend, main, inventory, allCards);
+  // Rangfolge: Was du von einer Turnierliste schon umsetzt, ist erprobt und
+  // wiegt mehr als die Heuristik – die schätzt Profi-Entscheidungen um etwa
+  // einen Punkt zu niedrig ein.
+  const rating = strength + 6 * (metaRef?.coverage ?? 0);
+
   return {
     legend, champion, hasChampion,
     identity: [...identity], main, runes, battlefields, curve,
@@ -414,15 +424,49 @@ export function buildDeck(inventory, legendEntry, allCards, metaDecks = []) {
       battlefields: RULES.BATTLEFIELDS - battlefields.length,
     },
     complete,
-    score: Math.round(best.value * 10) / 10,
+    score: Math.round(strength * 10) / 10,
+    rating,
+    metaRef,
     avgEnergy: Math.round((main.reduce((s, m) => s + (m.card.energy ?? 0) * m.count, 0) / Math.max(total, 1)) * 100) / 100,
     engine: engineReport(legend, finalCtx),
     metaDecks: metaIndexSize(env.meta),
-    upgrades: findUpgrades(allCards, inventory, env, identity, legal, main, finalCtx),
   };
 }
 
 const metaIndexSize = m => (m.size ? [...m.values()][0].of : 0);
+
+/**
+ * Abgleich mit der passendsten Turnierliste dieser Legende:
+ *   coverage – wie viel der Liste steckt schon in deinem Deck (0..1)
+ *   owned    – wie viel der Liste besitzt du überhaupt (0..1)
+ *   missing  – was dir zur Liste fehlt, das ist das Ausbauziel
+ * Nicht für den Deckbau – der nimmt ausschließlich Karten aus dem Bestand.
+ */
+function metaMatch(metaDecks, legend, main, inventory, allCards) {
+  const lists = metaDecks.filter(d => d.legendKey === key(legend));
+  if (!lists.length) return null;
+  const inDeck = new Map(main.map(m => [key(m.card), m.count]));
+  const byKey = new Map(canonical(allCards).map(c => [key(c), c]));
+  let best = null;
+  for (const d of lists) {
+    let need = 0, used = 0, have = 0;
+    const missing = [];
+    for (const [k, n0] of d.cards) {
+      const n = Math.min(n0, RULES.MAX_COPIES);
+      const card = byKey.get(k);
+      if (!card || isBanned(card)) continue;
+      const own = inventory.owned.get(k)?.qty ?? 0;
+      need += n;
+      used += Math.min(n, inDeck.get(k) ?? 0);
+      have += Math.min(n, own);
+      if (own < n) missing.push({ card, need: n, have: own, missing: n - own });
+    }
+    const r = { name: d.name ?? 'Turnierliste', coverage: need ? used / need : 0, owned: need ? have / need : 0,
+      need, missing: missing.sort((a, b) => b.missing - a.missing) };
+    if (!best || r.owned > best.owned) best = r;
+  }
+  return best;
+}
 
 function blend(a, b) {
   const mix = (x, y) => {
@@ -556,28 +600,6 @@ function engineReport(legend, ctx) {
 }
 
 /**
- * Welche Karten würden dieses Deck am stärksten verbessern?
- * Bewertet den gesamten offiziellen Kartenpool der Identität im Kontext des
- * fertigen Decks – das ist die Wunschliste.
- */
-function findUpgrades(allCards, inventory, env, identity, legal, main, ctx) {
-  const inDeck = new Map(main.map(m => [key(m.card), m.count]));
-  const weakest = main.length ? Math.min(...main.map(m => m.score)) : 0;
-
-  return canonical(allCards)
-    .filter(c => legal(c) && c.rarity !== 'showcase')
-    .map(c => {
-      const ownedQty = inventory.owned.get(key(c))?.qty ?? 0;
-      const missing = RULES.MAX_COPIES - Math.max(ownedQty, inDeck.get(key(c)) ?? 0);
-      const r = contextScore(c, env, ctx, 2);
-      return { card: c, score: r.score, ownedQty, missing };
-    })
-    .filter(u => u.missing > 0 && u.score > weakest && u.score > UNPLAYABLE)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 30);
-}
-
-/**
  * Deck-Check für eine beliebige Liste (z. B. ein eingefügtes eigenes Deck):
  * welche Karten funktionieren in dieser Zusammenstellung nicht?
  */
@@ -639,7 +661,7 @@ export function suggestDecks(inventory, allCards, metaDecks = []) {
   return [...inventory.owned.values()]
     .filter(o => o.card.type === 'legend')
     .map(l => buildDeck(inventory, l, allCards, metaDecks))
-    .sort((a, b) => (b.complete - a.complete) || b.score - a.score);
+    .sort((a, b) => (b.complete - a.complete) || b.rating - a.rating);
 }
 
 /**
