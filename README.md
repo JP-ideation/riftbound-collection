@@ -16,6 +16,7 @@ Datenbank – die Sammlung bleibt im Browser des jeweiligen Geräts.
 | **Decks** | Für **jede** Legende im Bestand das stärkste legale Deck – **ausschließlich aus eigenen Karten**, sortiert nach Bewertung. Dazu je Deck der „Weg zur Turnierliste“: was dir zur Profi-Liste dieser Legende fehlt |
 | **Meta-Decks** | Beliebige Deckliste einfügen → Vollständigkeit in Prozent, fehlende Karten und Deck-Check (unspielbare Karten, unerfüllte Bedingungen). Meta-Listen mit Legende fließen in den Deckbau ein |
 | **Wunschliste** | Ausbauziele: was dir zu Turnierlisten deiner Legenden fehlt; Karten, die mehrere Listen brauchen, stehen oben |
+| **Regeln** | Zugablauf (A-B-C-D), Runen/Energie/Power, Kartensymbole, Kampf, Timing (Action/Reaction/Chain), alle Schlüsselwörter mit offiziellem Kartentext, Erklärung und Tipp. Auch ohne Sammlung nutzbar; jede Deckansicht listet die Schlüsselwörter ihres Decks |
 | **Teilen** | Sammlung exportieren, Sammlungen von Freunden einfügen und beidseitig abgleichen |
 
 ## Kartendaten
@@ -109,6 +110,7 @@ js/db.js              Kartendatenbank laden, Sammlung zuordnen
 js/banlist.js         offizielle Bannliste (Standard), Stand 18.09.2026
 js/mechanics.js       Kartenmechanik aus dem Kartentext: was eine Karte braucht und liefert
 js/deckbuilder.js     Deckgenerator, Bewertung im Deckzusammenhang, Deck-Check, Wunschliste
+js/rules.js           Regeltexte und Schlüsselwörter zum Nachschlagen
 js/guide.js           Spielhilfe je Deck (aus der Deckzusammensetzung)
 js/app.js             Oberfläche und Zustand
 scripts/fetch-cards.mjs   Kartendaten von Riot holen

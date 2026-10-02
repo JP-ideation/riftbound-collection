@@ -8,6 +8,7 @@
  *   Mindestens eine Champion-Einheit des Legenden-Champions (Chosen Champion).
  *   Signature-Karten nur vom eigenen Champion, höchstens 3 insgesamt.
  *   Keine gebannten Karten und Schlachtfelder (banlist.js).
+ *   [Unique]-Karten höchstens 1× ("Your deck can have only 1 card with this name").
  *
  * Bewertet wird nicht die Einzelkarte, sondern die Karte IN DIESEM DECK:
  * Was sie braucht (XP, Stammesfutter, Zauber …) muss das Deck liefern, sonst
@@ -116,6 +117,9 @@ const KEYWORDS = [
  * nie ins Deck – auch wenn der Scanner sie mit in die Sammlung schreibt.
  */
 export const isToken = c => /^[A-Z]+-T\d/.test(c.code ?? '');
+
+/** Höchstzahl je Karte: 3, bei [Unique] nur 1. */
+export const maxCopies = c => (/\[Unique\]/.test(c.text ?? '') ? 1 : RULES.MAX_COPIES);
 
 function inIdentity(card, identity) {
   const d = card.domains ?? [];
@@ -510,7 +514,7 @@ function assemble(scored, allCards, names, champion, trustPool = false) {
       ? Math.min(Math.max(0, buckets[b]), Math.max(0, typeSlots[t] ?? 0))
       : Infinity;
     const k = key(entry.card);
-    let n = Math.min(limit - (used.get(k) ?? 0), entry.qty - (used.get(k) ?? 0), RULES.MAIN - total, room);
+    let n = Math.min(Math.min(limit, maxCopies(entry.card)) - (used.get(k) ?? 0), entry.qty - (used.get(k) ?? 0), RULES.MAIN - total, room);
     if (sig) n = Math.min(n, RULES.SIGNATURES - signatures);
     if (n <= 0) return;
     used.set(k, (used.get(k) ?? 0) + n);
@@ -618,6 +622,7 @@ export function checkDeck(legend, main, allCards) {
     if (sig && champion && sig !== champion) problems.push({ card: m.card, count: m.count, text: `Signature-Karte von ${sig} – in einem ${champion}-Deck nicht erlaubt` });
     if (isToken(m.card)) { problems.push({ card: m.card, count: m.count, text: 'Spielmarke – entsteht im Spiel und gehört nicht ins Deck' }); continue; }
     if (isBanned(m.card)) { problems.push({ card: m.card, count: m.count, text: 'Gebannt – im Turnier (Standard) nicht erlaubt' }); continue; }
+    if (m.count > maxCopies(m.card)) problems.push({ card: m.card, count: m.count, text: `Höchstens ${maxCopies(m.card)}× erlaubt${maxCopies(m.card) === 1 ? ' ([Unique])' : ''}` });
     const r = contextScore(m.card, env, ctx, m.count);
     for (const w of r.why) if (w.ok === false && (w.sat ?? 0) < 0.5) problems.push({ card: m.card, count: m.count, text: w.text });
   }

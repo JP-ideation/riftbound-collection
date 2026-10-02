@@ -147,3 +147,17 @@ textarea { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-siz
   border-radius: 8px; padding: 10px 14px; font-size: 13px; color: #e8c46a; }
 .line small.warn { color: var(--warn); font-size: 12px; }
 .line[style*="display:block"] .e { text-align: left; display: block; margin-top: 2px; }
+
+/* Regeln */
+.rules-sec { margin-bottom: 12px; }
+.rules-sec summary { cursor: pointer; }
+.rules-body { margin-top: 10px; font-size: 14px; line-height: 1.55; }
+.rules-body ul, .rules-body ol { padding-left: 20px; margin: 6px 0; }
+.rules-body li { margin-bottom: 6px; }
+.rules-body code { background: var(--bg3); padding: 1px 5px; border-radius: 4px; font-size: 12.5px; }
+.tip { color: var(--accent); font-size: 13px; margin-top: 6px; }
+table.rules { width: 100%; border-collapse: collapse; font-size: 13px; }
+table.rules th, table.rules td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+table.rules th { color: var(--dim); font-weight: 600; }
+.line.kw .e { text-align: left; display: inline; color: var(--fg); font-size: 13.5px; }
+.line.kw .en { color: var(--dim); font-size: 12px; font-style: italic; margin-top: 3px; }

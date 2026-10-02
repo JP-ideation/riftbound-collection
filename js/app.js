@@ -3,6 +3,7 @@ import { loadCards, buildInventory, resolve, key } from './db.js';
 import { suggestDecks, deckToText, deckTitle, checkDeck, championOf, RULES } from './deckbuilder.js';
 import { buildGuide } from './guide.js';
 import { isBanned, BANNED_AS_OF } from './banlist.js';
+import { SECTIONS, KEYWORDS, keywordsIn } from './rules.js';
 
 const KEY = { coll: 'rb.collection.v1', meta: 'rb.metadecks.v1', friends: 'rb.friends.v1' };
 const DOMAINS = ['calm', 'mind', 'body', 'fury', 'order', 'chaos', 'colorless'];
@@ -118,10 +119,11 @@ function renderHead() {
 function render() {
   document.querySelectorAll('#nav button').forEach(b => b.classList.toggle('on', b.dataset.view === state.view));
   const v = $('#view');
-  if (!state.entries.length && state.view !== 'import') { v.innerHTML = viewImport(true); return; }
+  // Regeln brauchen keine Sammlung – die sollen auch ohne Import nachschlagbar sein.
+  if (!state.entries.length && !['import', 'regeln'].includes(state.view)) { v.innerHTML = viewImport(true); return; }
   v.innerHTML = ({
     sammlung: viewSammlung, decks: viewDecks, meta: viewMeta,
-    wunsch: viewWunsch, teilen: viewTeilen, import: viewImport,
+    wunsch: viewWunsch, teilen: viewTeilen, import: viewImport, regeln: viewRegeln,
   }[state.view] ?? viewSammlung)();
   window.scrollTo({ top: 0 });
 }
@@ -253,6 +255,7 @@ function viewDeckDetail(d) {
       Profi-Liste vor – das Deck folgt nur den Kartentexten (Regeln, Motor, Bedingungen). Spielbar, aber nicht turniererprobt.
       Mit einer eingefügten Turnierliste (Tab „Meta-Decks“) wählt die App aus deinen Karten gezielter aus.</div>`}
     ${guideBlock(d)}
+    ${deckKeywords(d)}
 
     <div class="cols">
       <div>
@@ -273,6 +276,17 @@ function viewDeckDetail(d) {
         </div>
       </div>
     </div>`;
+}
+
+/** Schlüsselwörter, die in diesem Deck vorkommen – zum schnellen Nachlesen am Tisch. */
+function deckKeywords(d) {
+  const kws = keywordsIn([d.legend, ...d.main.map(m => m.card)]);
+  if (!kws.length) return '';
+  return `<details class="card" style="margin-bottom:24px">
+    <summary><h3 style="display:inline">Schlüsselwörter in diesem Deck (${kws.length})</h3></summary>
+    <div class="lines" style="margin-top:12px">${kws.map(kwRow).join('')}</div>
+    <p class="sub" style="margin:10px 0 0">Zugablauf, Symbole und Kampfregeln: Tab „Regeln".</p>
+  </details>`;
 }
 
 /**
@@ -456,6 +470,27 @@ function metaCheck(text, own) {
     <div class="lines">${engine}${probs || '<div class="line">Keine Karte mit unerfüllter Bedingung.</div>'}</div>`;
 }
 
+/* --- Regeln --- */
+const kwRow = kw => `<div class="line kw" style="display:block" data-kw="${esc(kw.k.toLowerCase())}">
+  <b>[${esc(kw.k)}]</b> <span class="e">${esc(kw.de)}</span>
+  <div class="en">„${esc(kw.en)}" – z. B. ${esc(kw.card)}</div>
+  ${kw.tip ? `<div class="tip">Tipp: ${esc(kw.tip)}</div>` : ''}</div>`;
+
+function viewRegeln() {
+  return `
+    <h2>Regeln zum Nachschlagen</h2>
+    <p class="sub">Zugablauf, Symbole, Kampf, Timing und alle Schlüsselwörter. Die englischen Texte sind die offiziellen
+      Erinnerungstexte von den Karten, die Erklärungen und Tipps eigene Worte. Stand: Oktober 2026 (inkl. Set Radiance).</p>
+    ${SECTIONS.map((sec, i) => `<details class="card rules-sec" ${i < 3 ? 'open' : ''}>
+      <summary><h3 style="display:inline">${esc(sec.title)}</h3></summary>
+      <div class="rules-body">${sec.html}</div></details>`).join('')}
+    <details class="card rules-sec" open id="kwsec">
+      <summary><h3 style="display:inline">Schlüsselwörter (${KEYWORDS.length})</h3></summary>
+      <input type="search" id="kwq" placeholder="Schlüsselwort suchen, z. B. Hidden" style="margin:12px 0">
+      <div class="lines" id="kwlist">${KEYWORDS.map(kwRow).join('')}</div>
+    </details>`;
+}
+
 /* --- Wunschliste --- */
 function viewWunsch() {
   // Ausbauziele: nur, was dir zu Turnierlisten fehlt. Deine Decks selbst
@@ -595,6 +630,13 @@ document.addEventListener('click', async e => {
 });
 
 document.addEventListener('input', e => {
+  if (e.target.id === 'kwq') {
+    const q = e.target.value.trim().toLowerCase();
+    document.querySelectorAll('#kwlist .kw').forEach(el => {
+      el.style.display = !q || el.textContent.toLowerCase().includes(q) ? 'block' : 'none';
+    });
+    return;
+  }
   const map = { fq: 'q', fset: 'set', fdomain: 'domain', ftype: 'type', frarity: 'rarity' };
   const k = map[e.target.id];
   if (!k) return;
