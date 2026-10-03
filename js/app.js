@@ -1,6 +1,6 @@
 import { parseCollection, serializeCollection } from './parser.js';
 import { loadCards, buildInventory, resolve, key } from './db.js';
-import { suggestDecks, deckToText, deckTitle, checkDeck, championOf, RULES } from './deckbuilder.js';
+import { suggestDecks, deckToText, deckTitle, checkDeck, championOf, groupByDomain, RULES } from './deckbuilder.js';
 import { buildGuide } from './guide.js';
 import { isBanned, BANNED_AS_OF } from './banlist.js';
 import { SECTIONS, KEYWORDS, keywordsIn } from './rules.js';
@@ -334,7 +334,8 @@ function viewDeckDetail(d) {
     <div class="cols">
       <div>
         <h3>Hauptdeck · ${d.counts.main}/40</h3>
-        <div class="lines">${d.main.map(m => lineRow(m.count, m.card, null, (m.why ?? []).filter(w => w.ok === false).map(w => w.text))).join('')}</div>
+        ${groupByDomain(d).map(g => `<h4 class="domhead">${g.domains.map(x => `<span class="dom ${x}"></span>`).join('')} ${esc(g.label)} · ${g.count}</h4>
+        <div class="lines">${g.cards.map(m => lineRow(m.count, m.card, null, (m.why ?? []).filter(w => w.ok === false).map(w => w.text))).join('')}</div>`).join('')}
         <h3>Energiekurve</h3>
         <div class="curve">${curve}</div>
       </div>

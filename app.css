@@ -161,3 +161,4 @@ table.rules th, table.rules td { text-align: left; padding: 6px 8px; border-bott
 table.rules th { color: var(--dim); font-weight: 600; }
 .line.kw .e { text-align: left; display: inline; color: var(--fg); font-size: 13.5px; }
 .line.kw .en { color: var(--dim); font-size: 12px; font-style: italic; margin-top: 3px; }
+.domhead { margin: 14px 0 6px; font-size: 13px; letter-spacing: .3px; color: var(--dim); display: flex; align-items: center; gap: 6px; }

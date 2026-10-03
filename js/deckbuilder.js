@@ -768,6 +768,30 @@ export function suggestDecks(inventory, allCards, metaDecks = []) {
     .sort((a, b) => (b.complete - a.complete) || b.rating - a.rating);
 }
 
+const DOMAIN_NAME = { calm: 'Calm', mind: 'Mind', body: 'Body', fury: 'Fury', order: 'Order', chaos: 'Chaos' };
+const TYPE_ORDER = { unit: 0, spell: 1, gear: 2 };
+
+/**
+ * Hauptdeck nach Farbe gruppiert – zum Nachbauen geht man eine Farbe nach der
+ * anderen durch. Reihenfolge: die Domains der Legende, dann zweifarbige
+ * Karten, dann farblose. Innerhalb: Einheiten, Zauber, Gear; dann nach Kosten.
+ */
+export function groupByDomain(deck) {
+  const real = c => (c.domains ?? []).filter(d => d !== 'colorless');
+  const groups = [];
+  const add = (label, domains, filter) => {
+    const cards = deck.main.filter(m => filter(real(m.card)))
+      .sort((a, b) => (TYPE_ORDER[a.card.type] ?? 9) - (TYPE_ORDER[b.card.type] ?? 9)
+        || (a.card.energy ?? 0) - (b.card.energy ?? 0)
+        || (a.card.fullName ?? a.card.name).localeCompare(b.card.fullName ?? b.card.name));
+    if (cards.length) groups.push({ label, domains, cards, count: cards.reduce((s, m) => s + m.count, 0) });
+  };
+  for (const d of deck.identity) add(DOMAIN_NAME[d] ?? d, [d], r => r.length === 1 && r[0] === d);
+  add(deck.identity.map(d => DOMAIN_NAME[d] ?? d).join(' + '), deck.identity, r => r.length > 1);
+  add('Farblos', ['colorless'], r => r.length === 0);
+  return groups;
+}
+
 /**
  * Decklisten-Export im selben Textformat wie der Import.
  * Die Sammlernummer kommt aus publicCode, damit Runen als #R04 und nicht
@@ -782,5 +806,6 @@ export function deckToText(deck) {
   const line = (n, c) => `${n} ${c.fullName ?? c.name} (${c.set}) #${num(c)}`;
   const sec = (title, list) => list.length ? `\n// ${title}\n` + list.map(x => line(x.count, x.card)).join('\n') : '';
   return `// ${deckTitle(deck)}\n// Legende\n${line(1, deck.legend)}`
-    + sec('Hauptdeck', deck.main) + sec('Runen', deck.runes) + sec('Schlachtfelder', deck.battlefields) + '\n';
+    + groupByDomain(deck).map(g => sec(`Hauptdeck – ${g.label} (${g.count})`, g.cards)).join('')
+    + sec('Runen', deck.runes) + sec('Schlachtfelder', deck.battlefields) + '\n';
 }
