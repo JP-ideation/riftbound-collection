@@ -211,12 +211,16 @@ const DECK_FILTERS = [
   ['turnier', 'Mit Turnierliste'],
   ['turnier-nah', 'Nah an Turnierliste (≥ 75 % besessen)'],
   ['ohne', 'Ohne Turnierliste'],
+  ['leicht', 'Schwierigkeit: Einsteiger'],
+  ['mittel', 'Schwierigkeit: Mittel'],
+  ['schwer', 'Schwierigkeit: Fortgeschritten'],
 ];
 const DECK_SORTS = [
   ['bewertung', 'Bewertung'],
   ['turnier', 'Nähe zur Turnierliste'],
   ['besitz', 'Anteil Turnierkarten im Besitz'],
   ['staerke', 'Stärke der Karten'],
+  ['schwierigkeit', 'Schwierigkeit (leicht zuerst)'],
   ['name', 'Name'],
 ];
 const DECK_FILTER_FN = {
@@ -225,15 +229,24 @@ const DECK_FILTER_FN = {
   turnier: d => !!d.metaRef,
   'turnier-nah': d => (d.metaRef?.owned ?? 0) >= 0.75,
   ohne: d => !d.metaRef,
+  leicht: d => d.difficulty.level === 0,
+  mittel: d => d.difficulty.level === 1,
+  schwer: d => d.difficulty.level === 2,
 };
+// Einsteiger-Modus: leichte Decks rücken in der Bewertung etwas nach vorn,
+// schwere etwas nach hinten – ausgeblendet wird nichts.
+const beginnerBonus = d => (deckView().beginner ? (1 - d.difficulty.level) * 1.2 : 0);
 const DECK_SORT_FN = {
-  bewertung: (a, b) => b.rating - a.rating,
+  bewertung: (a, b) => (b.rating + beginnerBonus(b)) - (a.rating + beginnerBonus(a)),
+  schwierigkeit: (a, b) => a.difficulty.score - b.difficulty.score || b.rating - a.rating,
   turnier: (a, b) => (b.metaRef?.coverage ?? -1) - (a.metaRef?.coverage ?? -1) || b.rating - a.rating,
   besitz: (a, b) => (b.metaRef?.owned ?? -1) - (a.metaRef?.owned ?? -1) || b.rating - a.rating,
   staerke: (a, b) => b.score - a.score,
   name: (a, b) => (a.champion ?? a.legend.name).localeCompare(b.champion ?? b.legend.name),
 };
-const deckView = () => ({ filter: 'alle', sort: 'bewertung', ...read(KEY.deckView, {}) });
+const deckView = () => ({ filter: 'alle', sort: 'bewertung', beginner: false, ...read(KEY.deckView, {}) });
+const DIFF_CLS = ['ok', 'warn', 'bad'];
+const diffBadge = d => `<span class="badge ${DIFF_CLS[d.difficulty.level]}" title="Schwierigkeit ${num(d.difficulty.score)}/10">${esc(d.difficulty.label)}</span>`;
 const num = x => (Math.round(x * 10) / 10).toString().replace('.', ',');
 
 function viewDecks() {
@@ -260,8 +273,13 @@ function viewDecks() {
         <label style="flex:1;min-width:160px;font-size:12px;color:var(--dim)">Sortieren nach
           <select id="deckSort">${opts(DECK_SORTS, v.sort)}</select></label>
       </div>
+      <label style="display:flex;gap:8px;align-items:flex-start;margin-top:10px;font-size:13px;color:var(--dim)">
+        <input type="checkbox" id="deckBeginner" style="width:auto;flex:none;margin-top:2px" ${v.beginner ? 'checked' : ''}>
+        Ich bin Einsteiger – leichte Decks bei „Bewertung" etwas weiter nach vorn
+      </label>
       <p class="sub" style="margin:10px 0 0;font-size:12px"><b>Bewertung</b> = Stärke der Karten im Zusammenspiel (Motor der Legende,
-        erfüllte Bedingungen, Kurve) + Bonus für den umgesetzten Teil der Turnierliste. <b>Turnierliste %</b> = wie viel
+        erfüllte Bedingungen, Kurve) + Bonus für den umgesetzten Teil der Turnierliste. <b>Schwierigkeit</b> = wie viel das
+        Deck vom Spieler verlangt (Timing, Bedingungen, Legenden-Motor) – sie fließt nicht in die Bewertung ein. <b>Turnierliste %</b> = wie viel
         der Profi-Liste dein Deck enthält. <b>Besitz %</b> = wie viel der Profi-Liste du überhaupt hast.
         Regeln: 40 Karten, 12 Runen, 3 Schlachtfelder, max. 3 Kopien ([Unique] 1), Champion Pflicht, max. 3 Signature,
         Bannliste Stand ${new Date(BANNED_AS_OF).toLocaleDateString('de-DE')}.</p>
@@ -275,6 +293,7 @@ function viewDecks() {
             <div class="m">${d.champion ? esc(d.legend.name) + ' · ' : ''}${dots(d.identity)} ${d.identity.join(' + ')}</div></div>
           <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end">
             <span class="badge ${d.complete ? 'ok' : 'warn'}">${d.complete ? 'komplett' : 'unvollständig'}</span>
+            ${diffBadge(d)}
             ${d.metaRef ? `<span class="badge ${d.metaRef.coverage >= 0.75 ? 'ok' : d.metaRef.coverage >= 0.5 ? 'warn' : 'bad'}">Turnierliste ${pct(d.metaRef.coverage, 1)}%</span>`
               : '<span class="badge bad">ohne Turnierliste</span>'}
           </div>
@@ -308,6 +327,7 @@ function viewDeckDetail(d) {
     ${d.metaRef ? '' : `<div class="notice" style="margin-bottom:16px"><b>Ohne Turnierliste gebaut.</b> Für diese Legende liegt keine
       Profi-Liste vor – das Deck folgt nur den Kartentexten (Regeln, Motor, Bedingungen). Spielbar, aber nicht turniererprobt.
       Mit einer eingefügten Turnierliste (Tab „Meta-Decks“) wählt die App aus deinen Karten gezielter aus.</div>`}
+    ${difficultyBlock(d)}
     ${guideBlock(d)}
     ${deckKeywords(d)}
 
@@ -330,6 +350,22 @@ function viewDeckDetail(d) {
         </div>
       </div>
     </div>`;
+}
+
+/** Schwierigkeit mit Begründung und Hinweis für Einsteiger. */
+function difficultyBlock(d) {
+  const x = d.difficulty;
+  const hint = [
+    'Gut zum Lernen: Die Karten tun, was draufsteht, und verlangen wenig Timing.',
+    'Braucht etwas Übung: Einige Karten wollen im richtigen Moment gespielt werden.',
+    'Anspruchsvoll: Viele Entscheidungen pro Zug. Spiel es ein paar Mal locker, bevor du damit ins Turnier gehst – und lies vorher die Schlüsselwörter unten.',
+  ][x.level];
+  return `<div class="card" style="margin-bottom:16px">
+    <div class="row" style="gap:10px"><h3 style="margin:0">Schwierigkeit</h3>${diffBadge(d)}
+      <span class="sub" style="margin:0">${num(x.score)} von 10</span></div>
+    <p style="margin:10px 0 6px">${esc(hint)}</p>
+    <p class="sub" style="margin:0">Grund: ${esc(x.reasons.join(' · '))}${x.community ? ` · ${esc(x.community)}` : ''}</p>
+  </div>`;
 }
 
 /** Schlüsselwörter, die in diesem Deck vorkommen – zum schnellen Nachlesen am Tisch. */
@@ -704,6 +740,7 @@ document.addEventListener('input', e => {
 });
 
 document.addEventListener('change', e => {
+  if (e.target.id === 'deckBeginner') { store(KEY.deckView, { ...deckView(), beginner: e.target.checked }); return render(); }
   if (e.target.id === 'deckFilter' || e.target.id === 'deckSort') {
     store(KEY.deckView, { ...deckView(), [e.target.id === 'deckFilter' ? 'filter' : 'sort']: e.target.value });
     return render();

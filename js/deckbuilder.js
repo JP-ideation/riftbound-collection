@@ -18,6 +18,7 @@
  */
 import { initMechanics, analyze, satisfaction, needFeatures, MANDATORY_MIN, featureLabel, effectiveEnergy } from './mechanics.js';
 import { isBanned } from './banlist.js';
+import { difficulty } from './difficulty.js';
 
 /** Identitaetsschluessel: Name + Beiname, siehe db.js. */
 export const key = c => (c.fullName ?? c.name).toLowerCase();
@@ -446,7 +447,7 @@ export function buildDeck(inventory, legendEntry, allCards, metaDecks = []) {
   // einen Punkt zu niedrig ein.
   const rating = strength + 6 * (metaRef?.coverage ?? 0);
 
-  return {
+  const deck = {
     legend, champion, hasChampion,
     identity: [...identity], main, runes, battlefields, curve,
     counts: { main: total, runes: runeCount, battlefields: battlefields.length },
@@ -463,6 +464,8 @@ export function buildDeck(inventory, legendEntry, allCards, metaDecks = []) {
     engine: engineReport(legend, finalCtx),
     metaDecks: metaIndexSize(env.meta),
   };
+  deck.difficulty = difficulty(deck);
+  return deck;
 }
 
 /**

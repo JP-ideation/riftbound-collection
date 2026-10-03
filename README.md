@@ -13,7 +13,7 @@ Datenbank – die Sammlung bleibt im Browser des jeweiligen Geräts.
 | Bereich | Funktion |
 | --- | --- |
 | **Sammlung** | Import per Textdatei, Abgleich mit der offiziellen Kartendatenbank, Filter nach Set, Domain, Typ, Seltenheit und Kartentext |
-| **Decks** | Für **jede** Legende im Bestand das stärkste legale Deck – **ausschließlich aus eigenen Karten**. Filter (komplett, mit/ohne Turnierliste, nah an Turnierliste) und Sortierung (Bewertung, Nähe zur Turnierliste, Besitz, Stärke, Name). Dazu je Deck der „Weg zur Turnierliste“: was dir zur Profi-Liste dieser Legende fehlt |
+| **Decks** | Für **jede** Legende im Bestand das stärkste legale Deck – **ausschließlich aus eigenen Karten**. Filter (komplett, mit/ohne Turnierliste, nah an Turnierliste, Schwierigkeit) und Sortierung (Bewertung, Nähe zur Turnierliste, Besitz, Stärke, Schwierigkeit, Name). Jedes Deck mit Schwierigkeit Einsteiger/Mittel/Fortgeschritten und Einsteiger-Modus. Dazu je Deck der „Weg zur Turnierliste“: was dir zur Profi-Liste dieser Legende fehlt |
 | **Meta-Decks** | Beliebige Deckliste einfügen → Vollständigkeit in Prozent, fehlende Karten und Deck-Check (unspielbare Karten, unerfüllte Bedingungen). Meta-Listen mit Legende fließen in den Deckbau ein |
 | **Wunschliste** | Ausbauziele: was dir zu Turnierlisten deiner Legenden fehlt; Karten, die mehrere Listen brauchen, stehen oben |
 | **Regeln** | Zugablauf (A-B-C-D), Runen/Energie/Power, Kartensymbole, Kampf, Timing (Action/Reaction/Chain), alle Schlüsselwörter mit offiziellem Kartentext, Erklärung und Tipp. Auch ohne Sammlung nutzbar; jede Deckansicht listet die Schlüsselwörter ihres Decks |
@@ -111,6 +111,7 @@ js/banlist.js         offizielle Bannliste (Standard), Stand 18.09.2026
 js/mechanics.js       Kartenmechanik aus dem Kartentext: was eine Karte braucht und liefert
 js/deckbuilder.js     Deckgenerator, Bewertung im Deckzusammenhang, Deck-Check, Wunschliste
 js/rules.js           Regeltexte und Schlüsselwörter zum Nachschlagen
+js/difficulty.js      Schwierigkeit eines Decks (Einsteiger/Mittel/Fortgeschritten)
 js/guide.js           Spielhilfe je Deck (aus der Deckzusammensetzung)
 js/app.js             Oberfläche und Zustand
 scripts/fetch-cards.mjs   Kartendaten von Riot holen
@@ -182,6 +183,20 @@ Bestand; Turnierlisten zeigen, welche eigenen Karten zusammen funktionieren.
 
 **Ausbauziele** (Deckansicht „Weg zur Turnierliste“, Wunschliste, Meta-Tab)
 zeigen, was zur Profi-Liste fehlt – getrennt vom spielbaren Deck.
+
+## Schwierigkeit
+
+`js/difficulty.js` schätzt aus dem fertigen Deck, wie viel es vom Spieler
+verlangt: Reaktionen und Hidden-Karten (Timing), Karten mit Bedingungen,
+Spiel mit dem Ablagestapel, aktivierte Fähigkeiten, Zusatzbedingungen und
+einen Legenden-Motor, der Planung braucht. Klare Einheiten ohne Effekttext
+senken den Wert. Dazu Community-Einschätzungen je Legende (Master Yi leicht,
+Kennen und Diana schwer; Quellen im Code). Skala 0–10: unter 4 Einsteiger,
+unter 5,6 Mittel, darüber Fortgeschritten.
+
+Die Schwierigkeit fließt nicht in die Bewertung ein. Nur der Schalter „Ich bin
+Einsteiger“ zieht leichte Decks bei der Sortierung nach Bewertung etwas nach
+vorn.
 
 ## Spielhilfe
 
