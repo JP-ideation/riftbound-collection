@@ -18,6 +18,8 @@ const state = {
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const img = (c, w = 320) => c.img ? esc(c.img + '&w=' + w) : '';
+// Antippbar: öffnet das Kartenbild (siehe showCard)
+const cv = c => (c ? ` data-cardview="${esc((c.fullName ?? c.name).toLowerCase())}"` : '');
 // Anzeigename ist IMMER Name + Beiname. "Kennen" allein bezeichnet zwei
 // verschiedene Spielkarten und ist als Beschriftung unbrauchbar.
 const cname = c => c.fullName ?? c.name;
@@ -392,7 +394,7 @@ function pathBlock(d) {
     <h3 class="wishhead">Weg zur Turnierliste</h3>
     <p class="sub" style="margin:0 0 10px">Ausbauziel, kein Muss: Dein Deck oben ist schon spielbar. Vorbild ist
       <b>${esc(m.name)}</b> – davon besitzt du ${pct(m.owned, 1)}%${m.missing.length ? `, es fehlen ${m.missing.reduce((s, x) => s + x.missing, 0)} Karten` : ''}.</p>
-    <div class="lines">${m.missing.map(x => `<div class="line missing"><span class="c">fehlt ${x.missing}×</span>
+    <div class="lines">${m.missing.map(x => `<div class="line missing"${cv(x.card)}><span class="c">fehlt ${x.missing}×</span>
       <span class="n">${esc(cname(x.card))}</span><span class="e">${ident(x.card)} · du hast ${x.have}</span></div>`).join('')
       || '<div class="line">Du besitzt alle Karten dieser Liste.</div>'}</div>
   </div>`;
@@ -461,7 +463,7 @@ function viewMeine() {
   const kindLabel = { main: '', rune: ' (Rune)', bf: ' (Schlachtfeld)' };
   const row = (u, bad) => {
     const c = pinCard(u.k);
-    return `<div class="line ${bad ? 'missing' : ''}" style="display:block">
+    return `<div class="line ${bad ? 'missing' : ''}" style="display:block"${cv(c)}>
       <b>${esc(c ? cname(c) : u.k)}</b>${kindLabel[u.kind]}
       <span class="e">${c ? ident(c) : ''}</span><br>
       <span class="sub" style="margin:0">${u.per.map(x => `${esc(x.p.title.split(' – ')[0])} ${x.n}×`).join(' · ')}
@@ -551,7 +553,7 @@ function swapPlan(from, to, list) {
     if (take > 0) move.push({ k, n: take, unsure });
     if (short > take) blocked.push({ k, n: short - take });
   }
-  const line = (x, txt) => { const c = pinCard(x.k); return `<div class="line"><span class="c">${x.n}×</span>
+  const line = (x, txt) => { const c = pinCard(x.k); return `<div class="line"${cv(c)}><span class="c">${x.n}×</span>
     <span class="n">${esc(c ? cname(c) : x.k)}${txt ? ` <small class="warn">${txt}</small>` : ''}</span><span class="e">${c ? ident(c) : ''}</span></div>`; };
   return `<h4>Aus „${esc(from.title)}“ herausnehmen → in „${esc(to.title)}“</h4>
     <div class="lines">${move.map(x => line(x, x.unsure ? 'oder aus dem Deck, in dem sie gerade steckt' : '')).join('') || '<div class="line">Nichts – alle Karten sind frei verfügbar.</div>'}</div>
@@ -559,10 +561,30 @@ function swapPlan(from, to, list) {
       <div class="lines">${blocked.map(x => line(x, 'aus einem anderen Deck holen')).join('')}</div>` : ''}`;
 }
 
+/* --- Kartenansicht --- */
+/** Großes Kartenbild mit Text – per Tipp auf eine Kartenzeile oder Kachel. */
+function showCard(c) {
+  closeCard();
+  const own = state.inv?.owned.get((c.fullName ?? c.name).toLowerCase())?.qty ?? 0;
+  const el = document.createElement('div');
+  el.id = 'cardModal';
+  el.innerHTML = `<div class="cm-box" role="dialog" aria-label="${esc(cname(c))}">
+    <button class="cm-close" id="cardClose" aria-label="Schließen">×</button>
+    ${c.img ? `<img src="${img(c, 640)}" alt="${esc(cname(c))}">` : ''}
+    <div class="cm-info">
+      <b>${esc(cname(c))}</b>
+      <div class="e">${ident(c)}${c.might != null ? ` · ${c.might} Might` : ''} · ${esc(c.type)} · ${esc(c.rarity)}</div>
+      <div class="e">Du besitzt ${own}×</div>
+      ${c.text ? `<p class="cm-text">${esc(c.text)}</p>` : ''}
+    </div></div>`;
+  document.body.appendChild(el);
+}
+function closeCard() { document.getElementById('cardModal')?.remove(); }
+
 /* --- Spielhilfe --- */
 function guideBlock(d) {
   const g = buildGuide(d);
-  const mini = (c, n) => `<div class="minicard"><img loading="lazy" src="${img(c, 220)}" alt="${esc(cname(c))}">
+  const mini = (c, n) => `<div class="minicard"${cv(c)}><img loading="lazy" src="${img(c, 220)}" alt="${esc(cname(c))}">
     <span class="qty">${n}</span><div class="nm">${esc(cname(c))}</div></div>`;
   const list = (items, cls) => items.length
     ? `<ul class="${cls}">${items.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : '';
@@ -578,12 +600,12 @@ function guideBlock(d) {
     <h4>Schlüsselkarten</h4>
     <p class="sub" style="margin:0 0 10px">Darauf läuft das Deck hinaus – diese Karten willst du ausspielen und schützen.</p>
     <div class="minicards">${g.keyCards.map(k => mini(k.card, k.count)).join('')}</div>
-    <div class="lines" style="margin-top:10px">${g.keyCards.map(k => `<div class="line" style="display:block">
+    <div class="lines" style="margin-top:10px">${g.keyCards.map(k => `<div class="line" style="display:block"${cv(k.card)}>
       <b>${esc(cname(k.card))}</b><br><span class="e">${esc(k.why)}</span></div>`).join('')}</div>
 
     <h4>Bedingungen im Deck</h4>
     <p class="sub" style="margin:0 0 10px">Karten, deren Text etwas voraussetzt – und ob dieses Deck es liefert.</p>
-    <div class="lines">${g.checks.map(c => `<div class="line ${c.ok ? '' : 'missing'}" style="display:block">
+    <div class="lines">${g.checks.map(c => `<div class="line ${c.ok ? '' : 'missing'}" style="display:block"${cv(c.card)}>
       <b>${c.ok ? '✓' : '✗'} ${c.count}× ${esc(cname(c.card))}</b><br><span class="e">${esc(c.text)}</span></div>`).join('')
       || '<div class="line">Keine Karte im Deck stellt Bedingungen.</div>'}</div>
 
@@ -602,7 +624,7 @@ function guideBlock(d) {
     </div></div>
 
     <h4>Deine Schlachtfelder</h4>
-    <div class="lines">${d.battlefields.map(b => `<div class="line" style="display:block">
+    <div class="lines">${d.battlefields.map(b => `<div class="line" style="display:block"${cv(b.card)}>
       <b>${esc(cname(b.card))}</b><br><span class="e">${esc(b.card.text || '–')}</span></div>`).join('')}</div>
 
     <p class="sub" style="margin:16px 0 0;font-size:12px">Aus den Kartentexten abgeleitet: Motor der Legende, Bedingungen und
@@ -611,7 +633,7 @@ function guideBlock(d) {
   </div>`;
 }
 
-const lineRow = (n, c, label, warn = []) => `<div class="line"><span class="c">${n}×</span><span class="n">${esc(label ?? cname(c))}
+const lineRow = (n, c, label, warn = []) => `<div class="line"${cv(c)}><span class="c">${n}×</span><span class="n">${esc(label ?? cname(c))}
   ${warn.map(w => `<br><small class="warn">⚠ ${esc(w)}</small>`).join('')}</span>
   <span class="e">${ident(c)}</span></div>`;
 
@@ -664,7 +686,7 @@ function viewMeta() {
         <div class="bar-track"><div class="bar-fill ${cls === 'ok' ? '' : cls}" style="width:${d.a.pct}%"></div></div>
         ${metaCheck(d.text, d.own)}
         ${miss.length ? `<h3>Dir fehlen ${d.a.missing} Karten</h3>
-          <div class="lines">${miss.map(r => `<div class="line missing"><span class="c">fehlt ${r.missing}×</span>
+          <div class="lines">${miss.map(r => `<div class="line missing"${cv(r.card)}><span class="c">fehlt ${r.missing}×</span>
             <span class="n">${esc(r.card ? cname(r.card) : r.raw.rawName)}</span>
             <span class="e">${r.card ? ident(r.card) : 'unbekannte Karte'}</span></div>`).join('')}</div>`
           : '<div class="notice" style="margin-top:12px">Dieses Deck kannst du komplett bauen.</div>'}
@@ -700,7 +722,7 @@ function builtinBlock() {
               ${x.have}/${x.need} Karten vorhanden${x.legendOwned ? '' : ' · <b>Legende fehlt dir</b>'}</div></div>
           <span class="badge ${cls}">${x.pct}%</span>
         </summary>
-        <div class="lines" style="margin-top:10px">${x.rows.map(r => `<div class="line ${r.missing ? 'missing' : ''}">
+        <div class="lines" style="margin-top:10px">${x.rows.map(r => `<div class="line ${r.missing ? 'missing' : ''}"${cv(r.card)}>
           <span class="c">${r.need}×</span><span class="n">${esc(cname(r.card))}${r.missing ? ` <small class="warn">fehlt ${r.missing}×</small>` : ''}</span>
           <span class="e">${ident(r.card)}</span></div>`).join('')}</div>
         ${miss.length ? '' : '<div class="notice" style="margin-top:10px">Alle gelisteten Karten vorhanden.</div>'}
@@ -717,7 +739,7 @@ function metaCheck(text, own) {
   const engine = r.engine.map(e => `<div class="line" style="display:block"><b>Motor: ${esc(e.text)}</b><br>
     <span class="e">${String(e.have).replace('.', ',')} im Deck (${esc(e.label)}) – ${e.sat >= 0.8 ? 'läuft zuverlässig' : e.sat >= 0.4 ? 'läuft teilweise' : 'zu wenig'}</span></div>`).join('');
   for (const b of battlefields) if (isBanned(b)) r.problems.push({ card: b, count: 1, text: 'Gebanntes Schlachtfeld – im Turnier (Standard) nicht erlaubt' });
-  const probs = r.problems.map(p => `<div class="line missing" style="display:block"><b>${p.count}× ${esc(cname(p.card))}</b><br>
+  const probs = r.problems.map(p => `<div class="line missing" style="display:block"${cv(p.card)}><b>${p.count}× ${esc(cname(p.card))}</b><br>
     <span class="e">${esc(p.text)}</span></div>`).join('');
   return `<h3>Deck-Check · ${esc(legend.fullName ?? legend.name)} <span class="tag">${own ? 'nur geprüft' : 'fließt in den Deckbau ein'}</span></h3>
     <div class="lines">${engine}${probs || '<div class="line">Keine Karte mit unerfüllter Bedingung.</div>'}</div>`;
@@ -776,7 +798,7 @@ function viewWunsch() {
        brauchen davon nichts – das hier ist nur der Weg Richtung Profi-Liste. Karten, die mehrere Listen brauchen, stehen oben.</p>
     <div class="grid-stats">${kpi(list.length, 'verschiedene Karten')}${kpi(totalCards, 'Exemplare')}
       ${kpi(list.filter(x => x.why.size > 1).length, 'mehrfach gebraucht')}</div>
-    ${list.length ? `<div class="lines">${list.map(x => `<div class="line missing">
+    ${list.length ? `<div class="lines">${list.map(x => `<div class="line missing"${cv(x.card)}>
         <span class="c">fehlt ${x.n}×</span><span class="n">${esc(cname(x.card))}
         <span class="tag" style="margin-left:6px">${[...x.why].slice(0, 3).map(esc).join(', ')}${x.why.size > 3 ? ' +' + (x.why.size - 3) : ''}</span></span>
         <span class="e">${ident(x.card)}</span></div>`).join('')}</div>
@@ -838,6 +860,21 @@ async function copy(text, btn) {
 }
 
 document.addEventListener('click', async e => {
+  // Kartenbild: schließen per ×, Tipp daneben; öffnen per Tipp auf eine Karte
+  if (document.getElementById('cardModal')) {
+    if (e.target.id === 'cardClose' || e.target.id === 'cardModal') closeCard();
+    return;
+  }
+  const view = e.target.closest('[data-cardview]');
+  if (view && !e.target.closest('button, a, input, select')) {
+    const c = state.db.byName.get(view.dataset.cardview);
+    if (c) return showCard(c);
+  }
+  const tileEl = e.target.closest('.tile[data-card]');
+  if (tileEl) {
+    const c = state.db.cards.find(x => x.id === tileEl.dataset.card);
+    if (c) return showCard(c);
+  }
   const t = e.target.closest('button, [data-card]');
   if (!t) return;
 
@@ -897,6 +934,8 @@ document.addEventListener('click', async e => {
   }
   if (t.dataset.delfriend) { store(KEY.friends, read(KEY.friends, []).filter(f => f.id !== t.dataset.delfriend)); return render(); }
 });
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeCard(); });
 
 document.addEventListener('input', e => {
   if (e.target.id === 'kwq') {

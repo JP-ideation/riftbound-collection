@@ -17,6 +17,7 @@ Datenbank – die Sammlung bleibt im Browser des jeweiligen Geräts.
 | **Meine Decks** | Decks als „Spiele ich“ / „Baue ich“ anpinnen (Momentaufnahme, ändert sich nicht von selbst; neuere Version wird angezeigt). Überschneidungen: welche Karten mehrere Decks brauchen und wo die Kopien nicht reichen. Wechsel-Helfer: was aus Deck A in Deck B umgesteckt werden muss |
 | **Meta-Decks** | Beliebige Deckliste einfügen → Vollständigkeit in Prozent, fehlende Karten und Deck-Check (unspielbare Karten, unerfüllte Bedingungen). Meta-Listen mit Legende fließen in den Deckbau ein |
 | **Wunschliste** | Ausbauziele: was dir zu Turnierlisten deiner Legenden fehlt; Karten, die mehrere Listen brauchen, stehen oben |
+| **Kartenbild** | Jede Karte in Listen und Kacheln ist antippbar: großes Kartenbild, Kartentext, Domain, Kosten, Might und wie oft du sie besitzt |
 | **Regeln** | Zugablauf (A-B-C-D), Runen/Energie/Power, Kartensymbole, Kampf, Timing (Action/Reaction/Chain), alle Schlüsselwörter mit offiziellem Kartentext, Erklärung und Tipp. Auch ohne Sammlung nutzbar; jede Deckansicht listet die Schlüsselwörter ihres Decks |
 | **Teilen** | Sammlung exportieren, Sammlungen von Freunden einfügen und beidseitig abgleichen |
 
