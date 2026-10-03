@@ -5,12 +5,12 @@ import { buildGuide } from './guide.js';
 import { isBanned, BANNED_AS_OF } from './banlist.js';
 import { SECTIONS, KEYWORDS, keywordsIn } from './rules.js';
 
-const KEY = { coll: 'rb.collection.v1', meta: 'rb.metadecks.v1', friends: 'rb.friends.v1', deckView: 'rb.deckview.v1' };
+const KEY = { coll: 'rb.collection.v1', meta: 'rb.metadecks.v1', friends: 'rb.friends.v1', deckView: 'rb.deckview.v1', pins: 'rb.pins.v1' };
 const DOMAINS = ['calm', 'mind', 'body', 'fury', 'order', 'chaos', 'colorless'];
 
 const state = {
   db: null, entries: [], inv: null, decks: null, unmatched: [],
-  view: 'sammlung', deckIdx: null,
+  view: 'sammlung', deckIdx: null, pinOpen: null, swap: { from: '', to: '' },
   filter: { q: '', set: '', domain: '', type: '', rarity: '' },
 };
 
@@ -122,7 +122,7 @@ function render() {
   // Regeln brauchen keine Sammlung – die sollen auch ohne Import nachschlagbar sein.
   if (!state.entries.length && !['import', 'regeln'].includes(state.view)) { v.innerHTML = viewImport(true); return; }
   v.innerHTML = ({
-    sammlung: viewSammlung, decks: viewDecks, meta: viewMeta,
+    sammlung: viewSammlung, decks: viewDecks, meine: viewMeine, meta: viewMeta,
     wunsch: viewWunsch, teilen: viewTeilen, import: viewImport, regeln: viewRegeln,
   }[state.view] ?? viewSammlung)();
   window.scrollTo({ top: 0 });
@@ -320,6 +320,7 @@ function viewDeckDetail(d) {
       ${d.hasChampion ? '' : ` · <b>keine Champion-Einheit von ${esc(d.champion)} im Bestand</b> (Pflicht)`}
       ${d.metaRef ? ` · setzt ${pct(d.metaRef.coverage, 1)}% der Turnierliste um` : ''}</p>
 
+    ${pinButtons(d)}
     ${d.metaRef && d.metaRef.owned < 0.7 ? `<div class="notice" style="margin-bottom:16px"><b>Nur ${pct(d.metaRef.owned, 1)}% der
       Turnierliste im Besitz.</b> Das Deck folgt der Liste, so weit deine Karten reichen, und ersetzt den Rest durch Karten mit
       ähnlicher Rolle. Gegen echte Turnierdecks fehlt ihm aber die Kernausstattung – wichtigste fehlende Karten:
@@ -395,6 +396,167 @@ function pathBlock(d) {
       <span class="n">${esc(cname(x.card))}</span><span class="e">${ident(x.card)} · du hast ${x.have}</span></div>`).join('')
       || '<div class="line">Du besitzt alle Karten dieser Liste.</div>'}</div>
   </div>`;
+}
+
+/* --- Meine Decks (angepinnt) --- */
+const PIN_LABEL = { spiele: 'Spiele ich', baue: 'Baue ich' };
+const pins = () => read(KEY.pins, []);
+const pinOf = legendKey => pins().find(p => p.legendKey === legendKey);
+const pinCard = k => state.db.byName.get(k);
+
+/**
+ * Momentaufnahme eines Decks. Angepinnte Decks ändern sich NICHT mehr von
+ * selbst – ein Deck, das du gebaut hast, soll nicht nach einem Sammlungs- oder
+ * Meta-Update still anders aussehen. Neuere Versionen werden nur angezeigt.
+ */
+function snapshot(d, status) {
+  return {
+    id: key(d.legend), legendKey: key(d.legend), title: deckTitle(d), status, savedAt: Date.now(),
+    identity: d.identity,
+    main: d.main.map(m => [key(m.card), m.count]),
+    runes: d.runes.map(r => [key(r.card), r.count]),
+    battlefields: d.battlefields.map(b => key(b.card)),
+  };
+}
+const sig = list => list.map(([k, n]) => k + n).sort().join();
+const currentDeck = legendKey => decks().find(d => key(d.legend) === legendKey);
+const isOutdated = p => { const d = currentDeck(p.legendKey); return d && sig(p.main) !== sig(d.main.map(m => [key(m.card), m.count])); };
+
+function pinButtons(d) {
+  const p = pinOf(key(d.legend));
+  const btn = (status, label) => `<button class="btn sm ${p?.status === status ? 'primary' : ''}" data-pin="${status}">${label}</button>`;
+  return `<div class="row" style="margin:0 0 16px;gap:8px">
+    ${btn('spiele', '📌 Spiele ich')} ${btn('baue', '🔧 Baue ich')}
+    ${p ? `<button class="btn sm" data-unpin="${esc(p.legendKey)}">Nicht mehr anpinnen</button>
+      ${isOutdated(p) ? '<button class="btn sm" data-pinupdate="' + esc(p.legendKey) + '">Gespeicherte Version aktualisieren</button>' : ''}` : ''}
+    ${p ? `<span class="sub" style="margin:0">Gespeichert in „Meine Decks“${isOutdated(p) ? ' – diese Ansicht ist neuer als deine gespeicherte Version' : ''}</span>` : ''}
+  </div>`;
+}
+
+/** Wer braucht welche Karte wie oft? Über Hauptdeck, Runen und Schlachtfelder. */
+function usage(list) {
+  const use = new Map();
+  const add = (p, k, n, kind) => {
+    const u = use.get(k) ?? { k, kind, per: [], total: 0 };
+    u.per.push({ p, n }); u.total += n; use.set(k, u);
+  };
+  for (const p of list) {
+    p.main.forEach(([k, n]) => add(p, k, n, 'main'));
+    p.runes.forEach(([k, n]) => add(p, k, n, 'rune'));
+    p.battlefields.forEach(k => add(p, k, 1, 'bf'));
+  }
+  return [...use.values()];
+}
+const ownedQty = k => state.inv.owned.get(k)?.qty ?? 0;
+
+function viewMeine() {
+  const list = pins();
+  if (!list.length) return `<h2>Meine Decks</h2>
+    <div class="empty">Noch kein Deck angepinnt. Öffne im Tab „Decks“ ein Deck und tippe auf
+      <b>📌 Spiele ich</b> oder <b>🔧 Baue ich</b>.</div>`;
+
+  const shared = usage(list).filter(u => u.per.length > 1);
+  const conflict = shared.filter(u => u.total > ownedQty(u.k)).sort((a, b) => (b.total - ownedQty(b.k)) - (a.total - ownedQty(a.k)));
+  const fine = shared.filter(u => u.total <= ownedQty(u.k));
+  const kindLabel = { main: '', rune: ' (Rune)', bf: ' (Schlachtfeld)' };
+  const row = (u, bad) => {
+    const c = pinCard(u.k);
+    return `<div class="line ${bad ? 'missing' : ''}" style="display:block">
+      <b>${esc(c ? cname(c) : u.k)}</b>${kindLabel[u.kind]}
+      <span class="e">${c ? ident(c) : ''}</span><br>
+      <span class="sub" style="margin:0">${u.per.map(x => `${esc(x.p.title.split(' – ')[0])} ${x.n}×`).join(' · ')}
+        · du hast ${ownedQty(u.k)}${bad ? ` · <b style="color:var(--bad)">${u.total - ownedQty(u.k)} zu wenig – beim Wechsel umstecken</b>` : ''}</span>
+    </div>`;
+  };
+
+  const opts = sel => list.map(p => `<option value="${esc(p.legendKey)}" ${p.legendKey === sel ? 'selected' : ''}>${esc(p.title)}</option>`).join('');
+  const sw = state.swap;
+  const from = list.find(p => p.legendKey === sw.from), to = list.find(p => p.legendKey === sw.to);
+
+  return `
+    <h2>Meine Decks</h2>
+    <p class="sub">Decks, die du gerade spielst oder baust. Gespeichert ist jeweils die Liste vom Zeitpunkt des Anpinnens –
+      sie ändert sich nicht von selbst.</p>
+    <div class="decklist">${list.map(p => {
+      const n = p.main.reduce((s, [, c]) => s + c, 0);
+      const open = state.pinOpen === p.legendKey;
+      return `<div class="deckcard" style="cursor:default">
+        <div class="row" style="justify-content:space-between;align-items:flex-start">
+          <div><div class="t">${esc(p.title)}</div>
+            <div class="m">${dots(p.identity)} ${n} Karten · gespeichert ${new Date(p.savedAt).toLocaleDateString('de-DE')}</div></div>
+          <span class="badge ${p.status === 'spiele' ? 'ok' : 'warn'}">${PIN_LABEL[p.status]}</span>
+        </div>
+        ${isOutdated(p) ? '<div class="m" style="margin-top:8px;color:var(--warn)">Es gibt eine neuere Version dieses Decks (Sammlung oder Turnierdaten haben sich geändert).</div>' : ''}
+        <div class="row" style="margin-top:10px;gap:6px">
+          <button class="btn sm" data-pinopen="${esc(p.legendKey)}">${open ? 'Liste ausblenden' : 'Liste ansehen'}</button>
+          <button class="btn sm" data-pinstatus="${esc(p.legendKey)}">${p.status === 'spiele' ? '→ Baue ich' : '→ Spiele ich'}</button>
+          ${isOutdated(p) ? `<button class="btn sm" data-pinupdate="${esc(p.legendKey)}">Aktualisieren</button>` : ''}
+          <button class="btn sm" data-unpin="${esc(p.legendKey)}">Entfernen</button>
+        </div>
+        ${open ? pinList(p) : ''}
+      </div>`;
+    }).join('')}</div>
+
+    ${list.length > 1 ? `
+    <h3>Überschneidungen</h3>
+    <p class="sub">Karten, die mehrere deiner Decks brauchen. Rot: Deine Kopien reichen nicht für alle gleichzeitig –
+      diese Karten musst du beim Wechsel umstecken.</p>
+    ${conflict.length ? `<h4 style="color:var(--bad)">Umstecken nötig · ${conflict.length} Karten</h4>
+      <div class="lines">${conflict.map(u => row(u, true)).join('')}</div>` : '<div class="notice">Keine Engpässe – alle Decks lassen sich gleichzeitig gebaut halten.</div>'}
+    ${fine.length ? `<h4>Geteilt, aber genug Kopien · ${fine.length} Karten</h4>
+      <div class="lines">${fine.map(u => row(u, false)).join('')}</div>` : ''}
+
+    <h3>Deck wechseln</h3>
+    <p class="sub">Welche Karten musst du aus einem Deck nehmen, um ein anderes zu bauen? Angenommen wird, dass alle
+      anderen angepinnten Decks gebaut bleiben.</p>
+    <div class="card"><div class="row">
+      <label style="flex:1;min-width:150px;font-size:12px;color:var(--dim)">Von<select id="swapFrom"><option value="">–</option>${opts(sw.from)}</select></label>
+      <label style="flex:1;min-width:150px;font-size:12px;color:var(--dim)">Zu<select id="swapTo"><option value="">–</option>${opts(sw.to)}</select></label>
+    </div>${from && to && from !== to ? swapPlan(from, to, list) : ''}</div>` : ''}`;
+}
+
+/** Gespeicherte Liste eines angepinnten Decks, nach Farbe gruppiert. */
+function pinList(p) {
+  const main = p.main.map(([k, count]) => ({ card: pinCard(k), count })).filter(m => m.card);
+  const groups = groupByDomain({ main, identity: p.identity });
+  const rows = (arr) => arr.map(m => lineRow(m.count, m.card)).join('');
+  return `<div style="margin-top:12px">
+    ${groups.map(g => `<h4 class="domhead">${g.domains.map(x => `<span class="dom ${x}"></span>`).join('')} ${esc(g.label)} · ${g.count}</h4>
+      <div class="lines">${rows(g.cards)}</div>`).join('')}
+    <h4 class="domhead">Runen</h4><div class="lines">${rows(p.runes.map(([k, count]) => ({ card: pinCard(k), count })).filter(m => m.card))}</div>
+    <h4 class="domhead">Schlachtfelder</h4><div class="lines">${rows(p.battlefields.map(k => ({ card: pinCard(k), count: 1 })).filter(m => m.card))}</div>
+  </div>`;
+}
+
+/**
+ * Wechsel von A nach B: B wird neu gebaut, alle übrigen angepinnten Decks
+ * (außer A) bleiben stehen. Was B dann noch fehlt, kommt aus A.
+ */
+function swapPlan(from, to, list) {
+  const others = list.filter(p => p !== from && p !== to);
+  const held = k => others.reduce((s, p) => s + (p.main.find(([x]) => x === k)?.[1] ?? 0)
+    + (p.runes.find(([x]) => x === k)?.[1] ?? 0) + (p.battlefields.includes(k) ? 1 : 0), 0);
+  const inFrom = k => (from.main.find(([x]) => x === k)?.[1] ?? 0) + (from.runes.find(([x]) => x === k)?.[1] ?? 0)
+    + (from.battlefields.includes(k) ? 1 : 0);
+  const need = [...to.main, ...to.runes, ...to.battlefields.map(k => [k, 1])];
+  const move = [], blocked = [];
+  for (const [k, n] of need) {
+    const free = Math.max(0, ownedQty(k) - held(k) - inFrom(k));
+    const short = n - free;
+    if (short <= 0) continue;
+    const take = Math.min(short, inFrom(k));
+    // Mehr Decks brauchen die Karte, als du Exemplare hast: Wo sie gerade
+    // physisch steckt, weiß die App nicht – dann ehrlich darauf hinweisen.
+    const unsure = held(k) > 0 && held(k) + inFrom(k) > ownedQty(k);
+    if (take > 0) move.push({ k, n: take, unsure });
+    if (short > take) blocked.push({ k, n: short - take });
+  }
+  const line = (x, txt) => { const c = pinCard(x.k); return `<div class="line"><span class="c">${x.n}×</span>
+    <span class="n">${esc(c ? cname(c) : x.k)}${txt ? ` <small class="warn">${txt}</small>` : ''}</span><span class="e">${c ? ident(c) : ''}</span></div>`; };
+  return `<h4>Aus „${esc(from.title)}“ herausnehmen → in „${esc(to.title)}“</h4>
+    <div class="lines">${move.map(x => line(x, x.unsure ? 'oder aus dem Deck, in dem sie gerade steckt' : '')).join('') || '<div class="line">Nichts – alle Karten sind frei verfügbar.</div>'}</div>
+    ${blocked.length ? `<h4 style="color:var(--bad)">Steckt in anderen angepinnten Decks</h4>
+      <div class="lines">${blocked.map(x => line(x, 'aus einem anderen Deck holen')).join('')}</div>` : ''}`;
 }
 
 /* --- Spielhilfe --- */
@@ -682,6 +844,22 @@ document.addEventListener('click', async e => {
   if (t.dataset.view) { state.view = t.dataset.view; state.deckIdx = null; return render(); }
   if (t.dataset.deck) { state.deckIdx = +t.dataset.deck; return render(); }
   if (t.id === 'backDecks') { state.deckIdx = null; return render(); }
+  if (t.dataset.pin) {
+    const d = decks()[state.deckIdx];
+    store(KEY.pins, [...pins().filter(p => p.legendKey !== key(d.legend)), snapshot(d, t.dataset.pin)]);
+    return render();
+  }
+  if (t.dataset.unpin) { store(KEY.pins, pins().filter(p => p.legendKey !== t.dataset.unpin)); return render(); }
+  if (t.dataset.pinupdate) {
+    const d = currentDeck(t.dataset.pinupdate), old = pinOf(t.dataset.pinupdate);
+    if (d && old) store(KEY.pins, pins().map(p => (p.legendKey === old.legendKey ? snapshot(d, old.status) : p)));
+    return render();
+  }
+  if (t.dataset.pinstatus) {
+    store(KEY.pins, pins().map(p => (p.legendKey === t.dataset.pinstatus ? { ...p, status: p.status === 'spiele' ? 'baue' : 'spiele' } : p)));
+    return render();
+  }
+  if (t.dataset.pinopen) { state.pinOpen = state.pinOpen === t.dataset.pinopen ? null : t.dataset.pinopen; return render(); }
 
   if (t.id === 'doImport') {
     const txt = $('#importText').value.trim();
@@ -741,6 +919,10 @@ document.addEventListener('input', e => {
 });
 
 document.addEventListener('change', e => {
+  if (e.target.id === 'swapFrom' || e.target.id === 'swapTo') {
+    state.swap[e.target.id === 'swapFrom' ? 'from' : 'to'] = e.target.value;
+    return render();
+  }
   if (e.target.id === 'deckBeginner') { store(KEY.deckView, { ...deckView(), beginner: e.target.checked }); return render(); }
   if (e.target.id === 'deckFilter' || e.target.id === 'deckSort') {
     store(KEY.deckView, { ...deckView(), [e.target.id === 'deckFilter' ? 'filter' : 'sort']: e.target.value });
