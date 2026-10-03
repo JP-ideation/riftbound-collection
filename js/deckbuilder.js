@@ -277,7 +277,14 @@ function contextScore(card, env, ctx, count = 1) {
   const meta = env.meta.get(key(card));
   if (meta) {
     s += 16 * meta.freq;
-    why.push({ ok: true, text: `In ${meta.hits} von ${meta.of} Meta-Decks dieser Legende` });
+    why.push({ ok: true, text: meta.primary ? 'Aus der Turnierliste (Vorbild)' : 'Aus einer anderen Turnierliste dieser Legende' });
+  } else {
+    // Ersatz: übernimmt die Rolle einer Turnierkarte, die dir fehlt.
+    const sub = env.subst?.get(key(card));
+    if (sub) {
+      s += 16 * sub.value;
+      why.push({ ok: true, text: `Ersatz für ${sub.for} aus der Turnierliste (ähnliche Rolle)` });
+    }
   }
 
   // 4) Eigene Bedarfe: Was die Karte braucht, muss das Deck liefern.
@@ -323,22 +330,40 @@ const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
  * freq berücksichtigt die Kopienzahl: ein 3er-Kernstück wiegt voll, eine
  * einzelne Tech-Karte ein Drittel.
  */
-function metaIndex(metaDecks, legend) {
+function metaIndex(metaDecks, legend, inventory) {
   // Nur Listen derselben Legende: Zwei Legenden desselben Champions haben
   // verschiedene Motoren (Wuju Bladesman ≠ Wuju Master).
   const pool = metaDecks.filter(d => d.legendKey === key(legend));
   const out = new Map();
   if (!pool.length) return out;
-  const hits = new Map(), copies = new Map();
-  for (const d of pool) {
+
+  // EINE Liste ist das Vorbild – mehrere Listen mit verschiedenen Strategien
+  // zu mitteln ergibt ein Deck, das keine Strategie richtig spielt. Vorbild
+  // ist die aktuellste Liste (Gewicht), von der du am meisten besitzt.
+  const ownedShare = d => {
+    let need = 0, have = 0;
     for (const [k, n] of d.cards) {
-      hits.set(k, (hits.get(k) ?? 0) + 1);
-      copies.set(k, (copies.get(k) ?? 0) + Math.min(n, RULES.MAX_COPIES));
+      const c = Math.min(n, RULES.MAX_COPIES);
+      need += c;
+      have += Math.min(c, inventory?.owned.get(k)?.qty ?? 0);
+    }
+    return need ? have / need : 0;
+  };
+  const primary = pool.map(d => ({ d, score: (d.weight ?? 1) * (0.25 + ownedShare(d)) }))
+    .sort((a, b) => b.score - a.score)[0].d;
+
+  for (const d of pool) {
+    const isPrimary = d === primary;
+    for (const [k, n] of d.cards) {
+      // Vorbild: volles Gewicht, abgestuft nach Kopienzahl. Andere Listen:
+      // nur ein kleiner Bonus – sie zeigen, was sonst noch funktioniert.
+      const f = isPrimary ? 0.55 + 0.45 * Math.min(n, RULES.MAX_COPIES) / RULES.MAX_COPIES : 0.2;
+      const cur = out.get(k);
+      out.set(k, { hits: (cur?.hits ?? 0) + 1, of: pool.length, freq: Math.max(cur?.freq ?? 0, f),
+        primary: isPrimary || !!cur?.primary, copies: isPrimary ? Math.min(n, RULES.MAX_COPIES) : cur?.copies });
     }
   }
-  for (const [k, h] of hits) {
-    out.set(k, { hits: h, of: pool.length, freq: Math.min(1, (0.4 + 0.6 * copies.get(k) / (RULES.MAX_COPIES * pool.length))) * h / pool.length });
-  }
+  out.primary = primary;
   return out;
 }
 
@@ -363,8 +388,9 @@ export function buildDeck(inventory, legendEntry, allCards, metaDecks = []) {
     baseline, names, champion,
     base: new Map(pool.map(o => [key(o.card), baseScore(o.card, baseline)])),
     legendNeeds: analyze(legend).needs,
-    meta: metaIndex(metaDecks, legend),
+    meta: metaIndex(metaDecks, legend, inventory),
   };
+  env.subst = substitutes(env.meta, pool, allCards);
 
   // Iterativ: bewerten → Deck bauen → mit dem neuen Deck neu bewerten.
   // Enabler und Verbraucher ziehen sich so gegenseitig ins Deck oder fliegen
@@ -375,7 +401,7 @@ export function buildDeck(inventory, legendEntry, allCards, metaDecks = []) {
     const scored = pool
       .map(o => ({ ...o, score: contextScore(o.card, env, ctx, Math.min(o.qty, 2)).score }))
       .sort((a, b) => b.score - a.score || (a.card.energy ?? 0) - (b.card.energy ?? 0));
-    const main = assemble(scored, allCards, names, champion, env.meta.size > 0);
+    const main = assemble(scored, allCards, names, champion, env.meta.size > 0, env.meta);
     const deckCtx = contextOf(main, legend);
     const value = evaluate(main, env, deckCtx);
     if (!best || value > best.value) best = { main, value, ctx: deckCtx };
@@ -411,8 +437,10 @@ export function buildDeck(inventory, legendEntry, allCards, metaDecks = []) {
   // Stärke OHNE Meta-Bonus: nur so sind Decks verschiedener Legenden
   // vergleichbar. Sonst stünde jede Legende mit Turnierdaten automatisch oben,
   // auch wenn du für eine andere das bessere Deck besitzt.
-  const strength = evaluate(main, { ...env, meta: new Map() }, finalCtx);
-  const metaRef = metaMatch(metaDecks, legend, main, inventory, allCards);
+  const strength = evaluate(main, { ...env, meta: new Map(), subst: new Map() }, finalCtx);
+  // Abgleich mit genau der Liste, die auch Vorbild war.
+  const metaRef = metaMatch(env.meta.primary ? [env.meta.primary] : [], legend, main, inventory, allCards);
+  if (metaRef) metaRef.lists = metaIndexSize(env.meta);
   // Rangfolge: Was du von einer Turnierliste schon umsetzt, ist erprobt und
   // wiegt mehr als die Heuristik – die schätzt Profi-Entscheidungen um etwa
   // einen Punkt zu niedrig ein.
@@ -435,6 +463,64 @@ export function buildDeck(inventory, legendEntry, allCards, metaDecks = []) {
     engine: engineReport(legend, finalCtx),
     metaDecks: metaIndexSize(env.meta),
   };
+}
+
+/**
+ * Rolle einer Karte, um Ersatz für fehlende Turnierkarten zu finden: Typ,
+ * Kosten und was sie tut (zieht, entfernt, bewegt Gegner, kontert, Kampftrick,
+ * spielt nicht aus der Hand …).
+ */
+const ROLE = [
+  ['draw', /\bdraw\b|into your hand/i], ['removal', /\bkill\b|deals? \d|deal \d/i],
+  ['move', /move an enemy|move [^.]*enemy/i], ['counter', /counter a spell/i],
+  ['pump', /\+\d+ Might this turn|\[Assault \d\] this turn/i], ['stun', /\bstun/i],
+  ['recur', /from your trash|return a [^.]*trash/i], ['token', /token/i],
+  ['reaction', /\[Reaction\]/], ['hidden', /\[Hidden\]/], ['ganking', /\[Ganking\]/],
+  ['tank', /\[Tank\]/], ['deflect', /\[Deflect/], ['buff', /\[Buff\]|\bbuff\b/i],
+];
+function roleOf(c) {
+  const t = c.text ?? '';
+  const tags = new Set(ROLE.filter(([, re]) => re.test(t)).map(([r]) => r));
+  for (const f of analyze(c).provides.keys()) if (!['unit', 'spell', 'gear', 'trash'].includes(f)) tags.add(f);
+  return { type: c.type, energy: effectiveEnergy(c) ?? 0, tags };
+}
+function similarity(a, b) {
+  if (a.type !== b.type) return 0;
+  const d = Math.abs(a.energy - b.energy);
+  let s = d === 0 ? 0.35 : d === 1 ? 0.2 : 0;
+  if (!s) return 0;
+  const shared = [...a.tags].filter(t => b.tags.has(t)).length;
+  const union = new Set([...a.tags, ...b.tags]).size || 1;
+  return s + 0.65 * (shared / union);
+}
+
+/**
+ * Für jede Turnierkarte, die dir fehlt, die ähnlichste eigene Karte als
+ * Ersatz. Der Ersatz bekommt einen Teil des Meta-Gewichts – so behält das Deck
+ * die Form der Profi-Liste, auch wenn Karten fehlen.
+ */
+function substitutes(meta, pool, allCards) {
+  const out = new Map();
+  if (!meta.size) return out;
+  const owned = new Map(pool.map(o => [key(o.card), o]));
+  const byKey = new Map(canonical(allCards).map(c => [key(c), c]));
+  const candidates = pool.filter(o => !meta.has(key(o.card))).map(o => ({ o, role: roleOf(o.card) }));
+  for (const [k, m] of meta) {
+    if (!m.primary) continue;
+    const card = byKey.get(k);
+    if (!card || isBanned(card) || (owned.get(k)?.qty ?? 0) >= 2) continue;
+    const role = roleOf(card);
+    let best = null;
+    for (const c of candidates) {
+      const sim = similarity(role, c.role);
+      if (sim >= 0.6 && (!best || sim > best.sim)) best = { c, sim };
+    }
+    if (!best) continue;
+    const kk = key(best.c.o.card);
+    const value = 0.5 * m.freq * best.sim;
+    if (!out.has(kk) || out.get(kk).value < value) out.set(kk, { value, for: card.fullName ?? card.name });
+  }
+  return out;
 }
 
 const metaIndexSize = m => (m.size ? [...m.values()][0].of : 0);
@@ -467,7 +553,9 @@ function metaMatch(metaDecks, legend, main, inventory, allCards) {
     }
     const r = { name: d.name ?? 'Turnierliste', coverage: need ? used / need : 0, owned: need ? have / need : 0,
       need, missing: missing.sort((a, b) => b.missing - a.missing) };
-    if (!best || r.owned > best.owned) best = r;
+    r.weight = d.weight ?? 1;
+    // Vorbild ist die aktuellste Liste; bei gleichem Stand die, von der du am meisten besitzt.
+    if (!best || r.weight > best.weight || (r.weight === best.weight && r.owned > best.owned)) best = r;
   }
   return best;
 }
@@ -498,7 +586,7 @@ function evaluate(main, env, ctx) {
  * Hauptdeck füllen: Champion zuerst, dann kurvenbewusst nach Score, danach
  * Restauffüllung. Unspielbare Karten kommen nie hinein.
  */
-function assemble(scored, allCards, names, champion, trustPool = false) {
+function assemble(scored, allCards, names, champion, trustPool = false, meta = new Map()) {
   const main = [];
   const used = new Map();
   const buckets = targetCurve(scored, trustPool);
@@ -531,6 +619,14 @@ function assemble(scored, allCards, names, champion, trustPool = false) {
   if (champion) {
     const champ = scored.find(e => e.card.type === 'unit' && e.card.name === champion && e.card.subtitle);
     if (champ) take({ ...champ, score: Math.max(champ.score, 0) }, false, 1);
+  }
+  // Vorbild-Liste zuerst, in ihrer Kopienzahl: Profis spielen manche Karten
+  // bewusst nur 1–2×. Ohne diese Grenze füllen 3er-Sätze das Deck, bevor die
+  // ganze Liste drin ist.
+  for (const e of scored) {
+    if (total >= RULES.MAIN) break;
+    const m = meta.get(key(e.card));
+    if (m?.primary && m.copies) take(e, false, m.copies);
   }
   for (const e of scored) { if (total >= RULES.MAIN) break; take(e, true); }
   for (const e of scored) { if (total >= RULES.MAIN) break; take(e, false); }

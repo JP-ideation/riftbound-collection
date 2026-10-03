@@ -1,8 +1,9 @@
 {
- "updated": "2026-09-28",
- "note": "Kernlisten aus Top-8- und Best-Of-Decks der Regional Qualifiers der Vendetta-Saison (Utrecht, Barcelona, Singapur, Sydney, Hartford). Aus öffentlich einsehbaren Turnierberichten übernommen und gegen die offizielle Kartendatenbank, die Domain-Identität der Legende und die Bannliste vom 18.09.2026 geprüft. Teils unvollständig; Sideboards nicht enthalten.",
+ "updated": "2026-10-03",
+ "note": "Kernlisten aus Top-8- und Best-Of-Decks der Regional Qualifiers der Vendetta-Saison (Utrecht, Barcelona, Singapur, Sydney, Hartford, Vancouver, Atlanta) und Turniere nach dem Bann vom 18.09. (Kennen: CCS Invitational Qualifier, Convergence #3). Aus öffentlich einsehbaren Turnierberichten übernommen und gegen die offizielle Kartendatenbank, die Domain-Identität der Legende und die Bannliste vom 18.09.2026 geprüft. Listen nach dem Bann zählen doppelt. Teils unvollständig; Sideboards nicht enthalten.",
  "decks": [
   {
+   "weight": 1,
    "name": "Rengar – Pridestalker · Regional Qualifier Barcelona/Singapur (Prismaticism, Sieger RQ Los Angeles)",
    "legend": "Pridestalker",
    "event": "Regional Qualifier Barcelona/Singapur (Prismaticism, Sieger RQ Los Angeles)",
@@ -85,6 +86,7 @@
    ]
   },
   {
+   "weight": 1,
    "name": "Master Yi – Wuju Bladesman · Regional Qualifier Utrecht (Bakura)",
    "legend": "Wuju Bladesman, Starter",
    "event": "Regional Qualifier Utrecht (Bakura)",
@@ -147,6 +149,7 @@
    ]
   },
   {
+   "weight": 1,
    "name": "Irelia – Blade Dancer · Regional Qualifier Singapur (Big Willy Dfoe)",
    "legend": "Blade Dancer",
    "event": "Regional Qualifier Singapur (Big Willy Dfoe)",
@@ -229,6 +232,7 @@
    ]
   },
   {
+   "weight": 1,
    "name": "Akali – Rogue Assassin · Regional Qualifier Barcelona (ASC HaruKaze)",
    "legend": "Rogue Assassin",
    "event": "Regional Qualifier Barcelona (ASC HaruKaze)",
@@ -291,9 +295,10 @@
    ]
   },
   {
-   "name": "Kennen – Heart of the Tempest · Regional Qualifier Barcelona (ECL Mosik)",
+   "weight": 1,
+   "name": "Kennen – Heart of the Tempest · Regional Qualifier Barcelona (ECL Mosik) – vor dem Bann",
    "legend": "Heart of the Tempest",
-   "event": "Regional Qualifier Barcelona (ECL Mosik)",
+   "event": "Regional Qualifier Barcelona (ECL Mosik) – vor dem Bann",
    "placement": "Top 8",
    "date": "2026-08-23",
    "source": "mobalytics.gg",
@@ -381,6 +386,7 @@
    ]
   },
   {
+   "weight": 1,
    "name": "Jayce – Defender of Tomorrow · Regional Qualifier Singapur (justmilkey)",
    "legend": "Defender of Tomorrow",
    "event": "Regional Qualifier Singapur (justmilkey)",
@@ -463,6 +469,7 @@
    ]
   },
   {
+   "weight": 1,
    "name": "Rek'Sai – Void Burrower · Regional Qualifier Barcelona (Kevplayer)",
    "legend": "Void Burrower",
    "event": "Regional Qualifier Barcelona (Kevplayer)",
@@ -541,6 +548,7 @@
    ]
   },
   {
+   "weight": 1,
    "name": "Ezreal – Prodigal Explorer · Regional Qualifier Barcelona (PoW SpaghetiCode)",
    "legend": "Prodigal Explorer",
    "event": "Regional Qualifier Barcelona (PoW SpaghetiCode)",
@@ -587,6 +595,7 @@
    ]
   },
   {
+   "weight": 1,
    "name": "Azir – Emperor of the Sands · Regional Qualifier Utrecht (Squirtle)",
    "legend": "Emperor of the Sands",
    "event": "Regional Qualifier Utrecht (Squirtle)",
@@ -661,6 +670,7 @@
    ]
   },
   {
+   "weight": 1,
    "name": "Annie – Dark Child · Regional Qualifier Hartford (Prismaticism)",
    "legend": "Dark Child, Starter",
    "event": "Regional Qualifier Hartford (Prismaticism)",
@@ -735,6 +745,7 @@
    ]
   },
   {
+   "weight": 1,
    "name": "Diana – Scorn of the Moon · Regional Qualifier Sydney (CTG Alanzq)",
    "legend": "Scorn of the Moon",
    "event": "Regional Qualifier Sydney (CTG Alanzq)",
@@ -813,6 +824,7 @@
    ]
   },
   {
+   "weight": 1,
    "name": "Diana – Scorn of the Moon · Regional Qualifier Hartford (ASC Evansrhim)",
    "legend": "Scorn of the Moon",
    "event": "Regional Qualifier Hartford (ASC Evansrhim)",
@@ -895,6 +907,7 @@
    ]
   },
   {
+   "weight": 1,
    "name": "Sett – The Boss · Regional Qualifier Utrecht (CTCG Collin K)",
    "legend": "The Boss",
    "event": "Regional Qualifier Utrecht (CTCG Collin K)",
@@ -969,6 +982,7 @@
    ]
   },
   {
+   "weight": 1,
    "name": "Viktor – Herald of the Arcane · Regional Qualifier Utrecht (Rednaxell)",
    "legend": "Herald of the Arcane",
    "event": "Regional Qualifier Utrecht (Rednaxell)",
@@ -1051,6 +1065,7 @@
    ]
   },
   {
+   "weight": 1,
    "name": "Darius – Hand of Noxus · Regional Qualifier Utrecht (MICE DiamondHat)",
    "legend": "Hand of Noxus",
    "event": "Regional Qualifier Utrecht (MICE DiamondHat)",
@@ -1125,6 +1140,7 @@
    ]
   },
   {
+   "weight": 1,
    "name": "Ornn – Fire Below the Mountain · Regional Qualifier Barcelona (MICE TheManland)",
    "legend": "Fire Below the Mountain",
    "event": "Regional Qualifier Barcelona (MICE TheManland)",
@@ -1207,6 +1223,7 @@
    ]
   },
   {
+   "weight": 1,
    "name": "Lucian – Purifier · Regional Qualifier Hartford (Kaillou)",
    "legend": "Purifier",
    "event": "Regional Qualifier Hartford (Kaillou)",
@@ -1289,6 +1306,7 @@
    ]
   },
   {
+   "weight": 1,
    "name": "Lucian – Purifier · Regional Qualifier Sydney (LockOn)",
    "legend": "Purifier",
    "event": "Regional Qualifier Sydney (LockOn)",
@@ -1358,6 +1376,792 @@
     ],
     [
      "Relentless Pursuit",
+     3
+    ]
+   ]
+  },
+  {
+   "weight": 2,
+   "name": "Kennen – Heart of the Tempest · CCS $25.000 Showdown Invitational Qualifier (Koko Lopez) – nach dem Bann",
+   "legend": "Heart of the Tempest",
+   "event": "CCS $25.000 Showdown Invitational Qualifier (Koko Lopez) – nach dem Bann",
+   "placement": "7.",
+   "date": "2026-10",
+   "source": "tcgplayer.com",
+   "cards": [
+    [
+     "Kennen, Storm of Shuriken",
+     1
+    ],
+    [
+     "Baron Nashor",
+     1
+    ],
+    [
+     "Ezreal, Prodigy",
+     2
+    ],
+    [
+     "Fizz, Trickster",
+     2
+    ],
+    [
+     "Flash",
+     1
+    ],
+    [
+     "Gust",
+     1
+    ],
+    [
+     "Last Rites",
+     2
+    ],
+    [
+     "Lightning Rush",
+     3
+    ],
+    [
+     "Rhasa the Sunderer",
+     3
+    ],
+    [
+     "Ride the Wind",
+     1
+    ],
+    [
+     "Salvage",
+     1
+    ],
+    [
+     "Seal of Discord",
+     3
+    ],
+    [
+     "Shadow Order Disciple",
+     3
+    ],
+    [
+     "Shadows of the Past",
+     1
+    ],
+    [
+     "Star-Crossed",
+     2
+    ],
+    [
+     "Switcheroo",
+     2
+    ],
+    [
+     "Tail-Cloaked Matriarch",
+     3
+    ],
+    [
+     "The Harrowing",
+     1
+    ],
+    [
+     "Tideturner",
+     1
+    ],
+    [
+     "Tornado Warrior",
+     2
+    ],
+    [
+     "Traveling Merchant",
+     3
+    ],
+    [
+     "Treasure Hunter",
+     1
+    ]
+   ]
+  },
+  {
+   "weight": 2,
+   "name": "Kennen – Heart of the Tempest · Convergence #3 (Subops Gastaidon) – nach dem Bann",
+   "legend": "Heart of the Tempest",
+   "event": "Convergence #3 (Subops Gastaidon) – nach dem Bann",
+   "placement": "5.",
+   "date": "2026-10",
+   "source": "tcgplayer.com",
+   "cards": [
+    [
+     "Seal of Discord",
+     3
+    ],
+    [
+     "Sivir, Mercenary",
+     1
+    ],
+    [
+     "Star-Crossed",
+     2
+    ],
+    [
+     "Switcheroo",
+     1
+    ],
+    [
+     "Tactical Retreat",
+     1
+    ],
+    [
+     "Tail-Cloaked Matriarch",
+     2
+    ],
+    [
+     "Tideturner",
+     1
+    ],
+    [
+     "Tornado Warrior",
+     3
+    ],
+    [
+     "Traveling Merchant",
+     3
+    ],
+    [
+     "Trifarian Gloryseeker",
+     3
+    ],
+    [
+     "Unsung Hero",
+     1
+    ],
+    [
+     "Fizz, Trickster",
+     2
+    ],
+    [
+     "Cemetery Attendant",
+     1
+    ],
+    [
+     "Edge of Night",
+     1
+    ],
+    [
+     "Existential Dread",
+     1
+    ],
+    [
+     "Call to Glory",
+     3
+    ]
+   ]
+  },
+  {
+   "weight": 1,
+   "name": "Miss Fortune – Bounty Hunter · Regional Qualifier Utrecht (Vendilion)",
+   "legend": "Bounty Hunter",
+   "event": "Regional Qualifier Utrecht (Vendilion)",
+   "placement": "Best-Of",
+   "date": "2026",
+   "source": "mobalytics.gg",
+   "cards": [
+    [
+     "Miss Fortune, Captain",
+     1
+    ],
+    [
+     "Mindsplitter",
+     3
+    ],
+    [
+     "Elder Dragon",
+     3
+    ],
+    [
+     "Scryer's Bloom",
+     3
+    ],
+    [
+     "Last Rites",
+     2
+    ],
+    [
+     "Dazzling Aurora",
+     3
+    ],
+    [
+     "Flurry of Blades",
+     1
+    ],
+    [
+     "Gust",
+     3
+    ],
+    [
+     "Repulse",
+     2
+    ],
+    [
+     "Sabotage",
+     3
+    ],
+    [
+     "Mobilize",
+     3
+    ],
+    [
+     "Lunar Boon",
+     3
+    ],
+    [
+     "Catalyst of Aeons",
+     3
+    ],
+    [
+     "The Harrowing",
+     1
+    ]
+   ]
+  },
+  {
+   "weight": 1,
+   "name": "Renata Glasc – Chem-Baroness · Regional Qualifier Singapur (Purp)",
+   "legend": "Chem-Baroness",
+   "event": "Regional Qualifier Singapur (Purp)",
+   "placement": "Best-Of",
+   "date": "2026-09",
+   "source": "mobalytics.gg",
+   "cards": [
+    [
+     "Renata Glasc, Mastermind",
+     1
+    ],
+    [
+     "Enthralling Protector",
+     2
+    ],
+    [
+     "Patched Porobot",
+     3
+    ],
+    [
+     "Plundering Poro",
+     3
+    ],
+    [
+     "Kennen, Keeper of Balance",
+     2
+    ],
+    [
+     "Pit Crew",
+     3
+    ],
+    [
+     "Bard, Mercurial",
+     1
+    ],
+    [
+     "Vi, Peacekeeper",
+     1
+    ],
+    [
+     "Thousand-Tailed Watcher",
+     2
+    ],
+    [
+     "Shepherd's Heirloom",
+     3
+    ],
+    [
+     "Sprite Fountain",
+     3
+    ],
+    [
+     "Stupefy",
+     2
+    ],
+    [
+     "Deathgrip",
+     2
+    ],
+    [
+     "Hidden Blade",
+     3
+    ]
+   ]
+  },
+  {
+   "weight": 1,
+   "name": "LeBlanc – Deceiver · Kernkarten aus Top-Listen (Xi'an Top 8, Sydney 7., RQ Los Angeles 12.)",
+   "legend": "Deceiver",
+   "event": "Kernkarten aus Top-Listen (Xi'an Top 8, Sydney 7., RQ Los Angeles 12.)",
+   "placement": "Top 8",
+   "date": "2026-09",
+   "source": "mobalytics.gg",
+   "cards": [
+    [
+     "LeBlanc, Fragmented",
+     1
+    ],
+    [
+     "Soaring Scout",
+     3
+    ],
+    [
+     "Watchful Sentry",
+     3
+    ],
+    [
+     "Mirror Image",
+     3
+    ],
+    [
+     "Karthus, Eternal",
+     2
+    ],
+    [
+     "Glasc Mixologist",
+     2
+    ],
+    [
+     "Ruined Rex",
+     2
+    ],
+    [
+     "Black Rose Dignitary",
+     2
+    ],
+    [
+     "Honest Broker",
+     2
+    ],
+    [
+     "Cull the Weak",
+     2
+    ],
+    [
+     "Deathgrip",
+     2
+    ],
+    [
+     "Hidden Blade",
+     2
+    ],
+    [
+     "Harnessed Dragon",
+     2
+    ],
+    [
+     "Rift Herald",
+     2
+    ],
+    [
+     "Baited Hook",
+     2
+    ]
+   ]
+  },
+  {
+   "weight": 1,
+   "name": "Jinx – Loose Cannon · Regional Qualifier Vancouver (Spiritless)",
+   "legend": "Loose Cannon",
+   "event": "Regional Qualifier Vancouver (Spiritless)",
+   "placement": "Best-Of",
+   "date": "2026",
+   "source": "mobalytics.gg",
+   "cards": [
+    [
+     "Jinx, Demolitionist",
+     1
+    ],
+    [
+     "Inferna",
+     3
+    ],
+    [
+     "Overzealous Fan",
+     2
+    ],
+    [
+     "Tideturner",
+     1
+    ],
+    [
+     "Traveling Merchant",
+     3
+    ],
+    [
+     "Vi, Destructive",
+     3
+    ],
+    [
+     "Pyke, Dockside Butcher",
+     3
+    ],
+    [
+     "Sharkling",
+     3
+    ],
+    [
+     "Kha'Zix, Mutating Horror",
+     2
+    ],
+    [
+     "Noxus Hopeful",
+     3
+    ],
+    [
+     "Vex, Apathetic",
+     2
+    ],
+    [
+     "Blood Rush",
+     1
+    ],
+    [
+     "Cleave",
+     2
+    ],
+    [
+     "Gust",
+     1
+    ],
+    [
+     "Falling Star",
+     1
+    ],
+    [
+     "Flash",
+     1
+    ],
+    [
+     "Hard Bargain",
+     1
+    ],
+    [
+     "Ride the Wind",
+     2
+    ],
+    [
+     "Switcheroo",
+     2
+    ],
+    [
+     "Star-Crossed",
+     1
+    ]
+   ]
+  },
+  {
+   "weight": 1,
+   "name": "Vex – Gloomist · Regional Qualifier Sydney (EEP Bonk Repeat)",
+   "legend": "Gloomist",
+   "event": "Regional Qualifier Sydney (EEP Bonk Repeat)",
+   "placement": "Top 4",
+   "date": "2026",
+   "source": "mobalytics.gg",
+   "cards": [
+    [
+     "Vex, Apathetic",
+     1
+    ],
+    [
+     "Evelynn, Entrancing",
+     3
+    ],
+    [
+     "Mutated Mouser",
+     3
+    ],
+    [
+     "Teemo, Scout",
+     3
+    ],
+    [
+     "Treasure Hunter",
+     2
+    ],
+    [
+     "Pyke, Returned",
+     2
+    ],
+    [
+     "Ember Monk",
+     2
+    ],
+    [
+     "Kha'Zix, Mutating Horror",
+     2
+    ],
+    [
+     "Sona, Harmonious",
+     2
+    ],
+    [
+     "Boots of Swiftness",
+     2
+    ],
+    [
+     "Edge of Night",
+     2
+    ],
+    [
+     "Defy",
+     2
+    ],
+    [
+     "Existential Dread",
+     2
+    ],
+    [
+     "Gust",
+     2
+    ],
+    [
+     "Discipline",
+     3
+    ],
+    [
+     "Emperor's Divide",
+     3
+    ],
+    [
+     "Switcheroo",
+     1
+    ],
+    [
+     "Back Off",
+     2
+    ],
+    [
+     "Star-Crossed",
+     1
+    ]
+   ]
+  },
+  {
+   "weight": 1,
+   "name": "Fiora – Grand Duelist · Regional Qualifier Singapur (Fr0zen)",
+   "legend": "Grand Duelist",
+   "event": "Regional Qualifier Singapur (Fr0zen)",
+   "placement": "Top 8",
+   "date": "2026-09",
+   "source": "mobalytics.gg",
+   "cards": [
+    [
+     "Fiora, Worthy",
+     1
+    ],
+    [
+     "Poppy, Paragon",
+     2
+    ],
+    [
+     "Rengar, Trophy Hunter",
+     3
+    ],
+    [
+     "Sett, Brawler",
+     1
+    ],
+    [
+     "Harnessed Dragon",
+     2
+    ],
+    [
+     "Rift Herald",
+     3
+    ],
+    [
+     "Elder Dragon",
+     3
+    ],
+    [
+     "Divining Shells",
+     2
+    ],
+    [
+     "Shepherd's Heirloom",
+     3
+    ],
+    [
+     "Dazzling Aurora",
+     3
+    ],
+    [
+     "Flurry of Blades",
+     2
+    ],
+    [
+     "Repulse",
+     2
+    ],
+    [
+     "Sacrifice",
+     3
+    ],
+    [
+     "Challenge",
+     2
+    ],
+    [
+     "Mobilize",
+     3
+    ],
+    [
+     "Riposte",
+     2
+    ],
+    [
+     "Rampage",
+     3
+    ]
+   ]
+  },
+  {
+   "weight": 1,
+   "name": "Fiora – Grand Duelist · Regional Qualifier Atlanta (VVES)",
+   "legend": "Grand Duelist",
+   "event": "Regional Qualifier Atlanta (VVES)",
+   "placement": "Best-Of",
+   "date": "2026",
+   "source": "mobalytics.gg",
+   "cards": [
+    [
+     "Fiora, Victorious",
+     1
+    ],
+    [
+     "Pit Rookie",
+     3
+    ],
+    [
+     "Unsung Hero",
+     3
+    ],
+    [
+     "First Mate",
+     3
+    ],
+    [
+     "Spectral Matron",
+     2
+    ],
+    [
+     "Sett, Brawler",
+     3
+    ],
+    [
+     "Karma, Channeler",
+     3
+    ],
+    [
+     "Doran's Blade",
+     2
+    ],
+    [
+     "B.F. Sword",
+     3
+    ],
+    [
+     "Punch First",
+     3
+    ],
+    [
+     "Sabotage",
+     2
+    ],
+    [
+     "Challenge",
+     3
+    ],
+    [
+     "Deathgrip",
+     3
+    ],
+    [
+     "Hidden Blade",
+     2
+    ],
+    [
+     "Riposte",
+     3
+    ],
+    [
+     "Call to Glory",
+     2
+    ]
+   ]
+  },
+  {
+   "weight": 1,
+   "name": "Fiora – Grand Duelist · Regional Qualifier Vancouver (Ricemaster)",
+   "legend": "Grand Duelist",
+   "event": "Regional Qualifier Vancouver (Ricemaster)",
+   "placement": "Best-Of",
+   "date": "2026",
+   "source": "mobalytics.gg",
+   "cards": [
+    [
+     "Fiora, Worthy",
+     1
+    ],
+    [
+     "Akshan, Mischievous",
+     3
+    ],
+    [
+     "Fiora, Victorious",
+     3
+    ],
+    [
+     "Sett, Brawler",
+     3
+    ],
+    [
+     "Harnessed Dragon",
+     1
+    ],
+    [
+     "Rift Herald",
+     3
+    ],
+    [
+     "Elder Dragon",
+     3
+    ],
+    [
+     "Doran's Blade",
+     2
+    ],
+    [
+     "Shepherd's Heirloom",
+     3
+    ],
+    [
+     "Dazzling Aurora",
+     3
+    ],
+    [
+     "Punch First",
+     1
+    ],
+    [
+     "Sacrifice",
+     3
+    ],
+    [
+     "Challenge",
+     3
+    ],
+    [
+     "Divining Shells",
+     3
+    ],
+    [
+     "Grim Resolve",
+     2
+    ],
+    [
+     "Riposte",
      3
     ]
    ]

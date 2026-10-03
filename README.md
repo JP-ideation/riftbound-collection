@@ -13,7 +13,7 @@ Datenbank – die Sammlung bleibt im Browser des jeweiligen Geräts.
 | Bereich | Funktion |
 | --- | --- |
 | **Sammlung** | Import per Textdatei, Abgleich mit der offiziellen Kartendatenbank, Filter nach Set, Domain, Typ, Seltenheit und Kartentext |
-| **Decks** | Für **jede** Legende im Bestand das stärkste legale Deck – **ausschließlich aus eigenen Karten**, sortiert nach Bewertung. Dazu je Deck der „Weg zur Turnierliste“: was dir zur Profi-Liste dieser Legende fehlt |
+| **Decks** | Für **jede** Legende im Bestand das stärkste legale Deck – **ausschließlich aus eigenen Karten**. Filter (komplett, mit/ohne Turnierliste, nah an Turnierliste) und Sortierung (Bewertung, Nähe zur Turnierliste, Besitz, Stärke, Name). Dazu je Deck der „Weg zur Turnierliste“: was dir zur Profi-Liste dieser Legende fehlt |
 | **Meta-Decks** | Beliebige Deckliste einfügen → Vollständigkeit in Prozent, fehlende Karten und Deck-Check (unspielbare Karten, unerfüllte Bedingungen). Meta-Listen mit Legende fließen in den Deckbau ein |
 | **Wunschliste** | Ausbauziele: was dir zu Turnierlisten deiner Legenden fehlt; Karten, die mehrere Listen brauchen, stehen oben |
 | **Regeln** | Zugablauf (A-B-C-D), Runen/Energie/Power, Kartensymbole, Kampf, Timing (Action/Reaction/Chain), alle Schlüsselwörter mit offiziellem Kartentext, Erklärung und Tipp. Auch ohne Sammlung nutzbar; jede Deckansicht listet die Schlüsselwörter ihres Decks |
@@ -156,9 +156,15 @@ Erinnerungstexte in Klammern werden dabei ignoriert – sonst gälte jede Karte 
 4. **Enabler** – was eine Karte liefert, zählt so viel, wie andere Karten im
    Deck es brauchen.
 5. **Meta** – Turnierlisten derselben Legende (mitgeliefert in `data/meta.json`
-   oder im Tab „Meta-Decks“ eingefügt): Karten daraus werden nach Häufigkeit
-   und Kopienzahl stark bevorzugt, und die Kurve folgt dann der Profi-Liste.
-   Decks ohne Turnierdaten sind in der App als solche markiert.
+   oder im Tab „Meta-Decks“ eingefügt). **Eine** Liste ist das Vorbild: die
+   aktuellste (`weight`, Listen nach der letzten Bannwelle zählen doppelt), von
+   der du am meisten besitzt. Mehrere Strategien zu mitteln ergäbe ein Deck,
+   das keine richtig spielt. Ihre Karten kommen zuerst ins Deck, in der
+   Kopienzahl der Liste; andere Listen geben nur einen kleinen Bonus.
+   **Ersatz:** Fehlt eine Karte der Vorbild-Liste, bekommt die eigene Karte mit
+   der ähnlichsten Rolle (Typ, Kosten, Funktion) einen Teil des Gewichts.
+   Bei vollständiger Sammlung bildet der Deckbau jede mitgelieferte Liste zu
+   100 % nach.
 6. **Grundwert** – Seltenheit, Might im Vergleich zu gleich teuren Einheiten,
    Schlüsselwörter, Abzug für sehr teure Karten. Kosten­senkungen wie bei Rhasa
    („kostet 1 weniger je Karte im Ablagestapel") werden berücksichtigt.

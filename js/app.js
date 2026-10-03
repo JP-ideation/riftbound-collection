@@ -5,7 +5,7 @@ import { buildGuide } from './guide.js';
 import { isBanned, BANNED_AS_OF } from './banlist.js';
 import { SECTIONS, KEYWORDS, keywordsIn } from './rules.js';
 
-const KEY = { coll: 'rb.collection.v1', meta: 'rb.metadecks.v1', friends: 'rb.friends.v1' };
+const KEY = { coll: 'rb.collection.v1', meta: 'rb.metadecks.v1', friends: 'rb.friends.v1', deckView: 'rb.deckview.v1' };
 const DOMAINS = ['calm', 'mind', 'body', 'fury', 'order', 'chaos', 'colorless'];
 
 const state = {
@@ -102,7 +102,7 @@ function builtinMeta() {
     const legend = state.db.byName.get(d.legend.toLowerCase());
     if (!legend) return null;
     const main = d.cards.map(([n, c]) => ({ card: state.db.byName.get(n.toLowerCase()), count: c })).filter(x => x.card);
-    return { name: d.name, legendKey: key(legend), champion: championOf(legend, state.db.cards), cards: countMap(main), builtin: d };
+    return { name: d.name, weight: d.weight ?? 1, legendKey: key(legend), champion: championOf(legend, state.db.cards), cards: countMap(main), builtin: d };
   }).filter(Boolean);
 }
 
@@ -204,38 +204,88 @@ function tile(c, qty, missing = false) {
 }
 
 /* --- Decks --- */
+/** Filter und Sortierung der Deckliste – gemerkt pro Gerät. */
+const DECK_FILTERS = [
+  ['alle', 'Alle'],
+  ['komplett', 'Komplett spielbar'],
+  ['turnier', 'Mit Turnierliste'],
+  ['turnier-nah', 'Nah an Turnierliste (≥ 75 % besessen)'],
+  ['ohne', 'Ohne Turnierliste'],
+];
+const DECK_SORTS = [
+  ['bewertung', 'Bewertung'],
+  ['turnier', 'Nähe zur Turnierliste'],
+  ['besitz', 'Anteil Turnierkarten im Besitz'],
+  ['staerke', 'Stärke der Karten'],
+  ['name', 'Name'],
+];
+const DECK_FILTER_FN = {
+  alle: () => true,
+  komplett: d => d.complete,
+  turnier: d => !!d.metaRef,
+  'turnier-nah': d => (d.metaRef?.owned ?? 0) >= 0.75,
+  ohne: d => !d.metaRef,
+};
+const DECK_SORT_FN = {
+  bewertung: (a, b) => b.rating - a.rating,
+  turnier: (a, b) => (b.metaRef?.coverage ?? -1) - (a.metaRef?.coverage ?? -1) || b.rating - a.rating,
+  besitz: (a, b) => (b.metaRef?.owned ?? -1) - (a.metaRef?.owned ?? -1) || b.rating - a.rating,
+  staerke: (a, b) => b.score - a.score,
+  name: (a, b) => (a.champion ?? a.legend.name).localeCompare(b.champion ?? b.legend.name),
+};
+const deckView = () => ({ filter: 'alle', sort: 'bewertung', ...read(KEY.deckView, {}) });
+const num = x => (Math.round(x * 10) / 10).toString().replace('.', ',');
+
 function viewDecks() {
   const list = decks();
   if (state.deckIdx != null && list[state.deckIdx]) return viewDeckDetail(list[state.deckIdx]);
   if (!list.length) return `<h2>Decks</h2><div class="empty">Keine Legende in der Sammlung – ohne Legende lässt sich kein Deck bauen.</div>`;
 
+  const v = deckView();
+  // Indizes beziehen sich immer auf die ungefilterte Liste – die Detailansicht greift darüber zu.
+  const best = list.findIndex(d => d.complete);
+  const shown = list.map((d, i) => ({ d, i }))
+    .filter(x => (DECK_FILTER_FN[v.filter] ?? DECK_FILTER_FN.alle)(x.d))
+    .sort((x, y) => (y.d.complete - x.d.complete) || (DECK_SORT_FN[v.sort] ?? DECK_SORT_FN.bewertung)(x.d, y.d));
+  const opts = (items, cur) => items.map(([k, l]) => `<option value="${k}" ${k === cur ? 'selected' : ''}>${l}</option>`).join('');
+
   return `
     <h2>Deine besten Decks</h2>
-    <p class="sub"><b>Ausschließlich aus Karten, die du besitzt</b> – nichts muss nachgekauft werden. Sortiert nach Stärke:
-       das beste Deck, das du heute legen kannst, steht oben. Turnierlisten dienen dabei als Vorbild, welche deiner
-       Karten zusammen funktionieren.<br><b>Bewertung</b> = Stärke der Karten im Zusammenspiel (Motor der Legende, erfüllte
-       Bedingungen, Kurve) plus Bonus für jeden Teil einer Turnierliste, den dein Deck schon umsetzt.<br>Je Legende das stärkste legale Deck –
-       40 Karten Hauptdeck, 12 Runen, 3 Schlachtfelder, max. 3 Kopien je Karte, nur Karten in der Domain-Identität der Legende,
-       Champion-Einheit Pflicht, max. 3 Signature-Karten, keine gebannten Karten
-       (Bannliste Stand ${new Date(BANNED_AS_OF).toLocaleDateString('de-DE')}).</p>
-    <div class="decklist">${list.map((d, i) => `
-      <button class="deckcard" data-deck="${i}" ${i === 0 && d.complete ? 'style="border-color:var(--accent)"' : ''}>
-        ${i === 0 && d.complete ? '<div class="m" style="color:var(--accent);font-weight:700;margin-bottom:6px">★ Dein stärkstes Deck</div>' : ''}
+    <p class="sub"><b>Ausschließlich aus Karten, die du besitzt</b> – nichts muss nachgekauft werden. Turnierlisten dienen als
+       Vorbild; fehlt dir eine Turnierkarte, nimmt das Deck eine eigene Karte mit ähnlicher Rolle.</p>
+    <div class="card" style="margin-bottom:14px">
+      <div class="row">
+        <label style="flex:1;min-width:160px;font-size:12px;color:var(--dim)">Filter
+          <select id="deckFilter">${opts(DECK_FILTERS, v.filter)}</select></label>
+        <label style="flex:1;min-width:160px;font-size:12px;color:var(--dim)">Sortieren nach
+          <select id="deckSort">${opts(DECK_SORTS, v.sort)}</select></label>
+      </div>
+      <p class="sub" style="margin:10px 0 0;font-size:12px"><b>Bewertung</b> = Stärke der Karten im Zusammenspiel (Motor der Legende,
+        erfüllte Bedingungen, Kurve) + Bonus für den umgesetzten Teil der Turnierliste. <b>Turnierliste %</b> = wie viel
+        der Profi-Liste dein Deck enthält. <b>Besitz %</b> = wie viel der Profi-Liste du überhaupt hast.
+        Regeln: 40 Karten, 12 Runen, 3 Schlachtfelder, max. 3 Kopien ([Unique] 1), Champion Pflicht, max. 3 Signature,
+        Bannliste Stand ${new Date(BANNED_AS_OF).toLocaleDateString('de-DE')}.</p>
+    </div>
+    <p class="sub">${shown.length} von ${list.length} Decks</p>
+    <div class="decklist">${shown.map(({ d, i }) => `
+      <button class="deckcard" data-deck="${i}" ${i === best ? 'style="border-color:var(--accent)"' : ''}>
+        ${i === best ? '<div class="m" style="color:var(--accent);font-weight:700;margin-bottom:6px">★ Dein stärkstes Deck</div>' : ''}
         <div class="row" style="justify-content:space-between;align-items:flex-start">
           <div><div class="t">${esc(d.champion ?? d.legend.name)}</div>
             <div class="m">${d.champion ? esc(d.legend.name) + ' · ' : ''}${dots(d.identity)} ${d.identity.join(' + ')}</div></div>
           <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end">
             <span class="badge ${d.complete ? 'ok' : 'warn'}">${d.complete ? 'komplett' : 'unvollständig'}</span>
-            ${d.metaRef ? `<span class="badge ${d.metaRef.coverage >= 0.75 ? 'ok' : 'warn'}">Turnierliste ${pct(d.metaRef.coverage, 1)}%</span>`
+            ${d.metaRef ? `<span class="badge ${d.metaRef.coverage >= 0.75 ? 'ok' : d.metaRef.coverage >= 0.5 ? 'warn' : 'bad'}">Turnierliste ${pct(d.metaRef.coverage, 1)}%</span>`
               : '<span class="badge bad">ohne Turnierliste</span>'}
           </div>
         </div>
         <div class="m" style="margin-top:10px">
-          Bewertung <b style="color:var(--accent)">${(Math.round(d.rating * 10) / 10).toString().replace('.', ',')}</b> ·
-          Ø ${d.avgEnergy} Energie · ${d.counts.main}/40 · ${d.counts.runes}/12 Runen · ${d.counts.battlefields}/3 BF
+          Bewertung <b style="color:var(--accent)">${num(d.rating)}</b> · Stärke ${num(d.score)}
+          ${d.metaRef ? ` · Besitz ${pct(d.metaRef.owned, 1)}%` : ''} ·
+          Ø ${d.avgEnergy} Energie · ${d.counts.main}/40
         </div>
-        <div class="bar-track"><div class="bar-fill ${d.complete ? '' : 'warn'}" style="width:${pct(d.counts.main, 40)}%"></div></div>
-      </button>`).join('')}</div>`;
+        <div class="bar-track"><div class="bar-fill ${d.metaRef ? (d.metaRef.coverage >= 0.75 ? '' : 'warn') : 'bad'}" style="width:${d.metaRef ? pct(d.metaRef.coverage, 1) : 100}%"></div></div>
+      </button>`).join('') || '<div class="empty">Kein Deck passt zu diesem Filter.</div>'}</div>`;
 }
 
 function viewDeckDetail(d) {
@@ -251,6 +301,10 @@ function viewDeckDetail(d) {
       ${d.hasChampion ? '' : ` · <b>keine Champion-Einheit von ${esc(d.champion)} im Bestand</b> (Pflicht)`}
       ${d.metaRef ? ` · setzt ${pct(d.metaRef.coverage, 1)}% der Turnierliste um` : ''}</p>
 
+    ${d.metaRef && d.metaRef.owned < 0.7 ? `<div class="notice" style="margin-bottom:16px"><b>Nur ${pct(d.metaRef.owned, 1)}% der
+      Turnierliste im Besitz.</b> Das Deck folgt der Liste, so weit deine Karten reichen, und ersetzt den Rest durch Karten mit
+      ähnlicher Rolle. Gegen echte Turnierdecks fehlt ihm aber die Kernausstattung – wichtigste fehlende Karten:
+      ${d.metaRef.missing.slice(0, 5).map(x => `${x.missing}× ${esc(cname(x.card))}`).join(', ')}. Vollständig unter „Weg zur Turnierliste".</div>` : ''}
     ${d.metaRef ? '' : `<div class="notice" style="margin-bottom:16px"><b>Ohne Turnierliste gebaut.</b> Für diese Legende liegt keine
       Profi-Liste vor – das Deck folgt nur den Kartentexten (Regeln, Motor, Bedingungen). Spielbar, aber nicht turniererprobt.
       Mit einer eingefügten Turnierliste (Tab „Meta-Decks“) wählt die App aus deinen Karten gezielter aus.</div>`}
@@ -650,6 +704,10 @@ document.addEventListener('input', e => {
 });
 
 document.addEventListener('change', e => {
+  if (e.target.id === 'deckFilter' || e.target.id === 'deckSort') {
+    store(KEY.deckView, { ...deckView(), [e.target.id === 'deckFilter' ? 'filter' : 'sort']: e.target.value });
+    return render();
+  }
   if (e.target.id !== 'importFile') return;
   const f = e.target.files?.[0];
   if (!f) return;
