@@ -1,6 +1,6 @@
 import { parseCollection, serializeCollection } from './parser.js';
 import { loadCards, buildInventory, resolve, key } from './db.js';
-import { suggestDecks, deckToText, deckTitle, checkDeck, championOf, groupByDomain, RULES } from './deckbuilder.js';
+import { suggestDecks, deckToText, deckToArena, deckTitle, checkDeck, championOf, groupByDomain, RULES } from './deckbuilder.js';
 import { buildGuide } from './guide.js';
 import { isBanned, BANNED_AS_OF } from './banlist.js';
 import { SECTIONS, KEYWORDS, keywordsIn } from './rules.js';
@@ -350,7 +350,8 @@ function viewDeckDetail(d) {
         <div class="lines">${d.battlefields.map(m => lineRow(1, m.card)).join('')}</div>
         ${pathBlock(d)}
         <div class="row" style="margin-top:14px">
-          <button class="btn" id="copyDeck">Deckliste kopieren</button>
+          <button class="btn primary" id="copyArena">Für TCG Arena kopieren</button>
+          <button class="btn" id="copyDeck">Deckliste kopieren (mit Set-Nummern)</button>
         </div>
       </div>
     </div>`;
@@ -493,6 +494,7 @@ function viewMeine() {
           <button class="btn sm" data-pinopen="${esc(p.legendKey)}">${open ? 'Liste ausblenden' : 'Liste ansehen'}</button>
           <button class="btn sm" data-pinstatus="${esc(p.legendKey)}">${p.status === 'spiele' ? '→ Baue ich' : '→ Spiele ich'}</button>
           ${isOutdated(p) ? `<button class="btn sm" data-pinupdate="${esc(p.legendKey)}">Aktualisieren</button>` : ''}
+          <button class="btn sm" data-pinarena="${esc(p.legendKey)}">Für TCG Arena kopieren</button>
           <button class="btn sm" data-unpin="${esc(p.legendKey)}">Entfernen</button>
         </div>
         ${open ? pinList(p) : ''}
@@ -515,6 +517,17 @@ function viewMeine() {
       <label style="flex:1;min-width:150px;font-size:12px;color:var(--dim)">Von<select id="swapFrom"><option value="">–</option>${opts(sw.from)}</select></label>
       <label style="flex:1;min-width:150px;font-size:12px;color:var(--dim)">Zu<select id="swapTo"><option value="">–</option>${opts(sw.to)}</select></label>
     </div>${from && to && from !== to ? swapPlan(from, to, list) : ''}</div>` : ''}`;
+}
+
+/** Angepinnte Momentaufnahme zurück in Deck-Form (für den Export). */
+function pinAsDeck(p) {
+  const legend = pinCard(p.legendKey);
+  const rows = list => list.map(([k, count]) => ({ card: pinCard(k), count })).filter(m => m.card);
+  return {
+    legend, champion: championOf(legend, state.db.cards), identity: p.identity,
+    main: rows(p.main), runes: rows(p.runes),
+    battlefields: p.battlefields.map(k => ({ card: pinCard(k), count: 1 })).filter(m => m.card),
+  };
 }
 
 /** Gespeicherte Liste eines angepinnten Decks, nach Farbe gruppiert. */
@@ -909,6 +922,11 @@ document.addEventListener('click', async e => {
     renderHead(); return render();
   }
   if (t.id === 'copyDeck') return copy(deckToText(decks()[state.deckIdx]), t);
+  if (t.id === 'copyArena') return copy(deckToArena(decks()[state.deckIdx]), t);
+  if (t.dataset.pinarena) {
+    const p = pinOf(t.dataset.pinarena);
+    if (p) return copy(deckToArena(pinAsDeck(p)), t);
+  }
   if (t.id === 'dlColl') return download('riftbound-sammlung.txt', serializeCollection(state.entries));
   if (t.id === 'copyColl') return copy(serializeCollection(state.entries), t);
   if (t.id === 'copyWish') {

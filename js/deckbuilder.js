@@ -793,6 +793,34 @@ export function groupByDomain(deck) {
 }
 
 /**
+ * Export für TCG Arena (tcg-arena.fr) und andere Riftbound-Deckseiten:
+ * Abschnitte Legend / Champion / MainDeck / Battlefields / Runes, je Zeile nur
+ * "Anzahl Kartenname" – ohne Set-Kennung und Sammlernummer. Die Legende heißt
+ * dort mit Championnamen ("Kennen, Heart of the Tempest").
+ *
+ * Der Chosen Champion zählt zu den 40 Karten: eine Kopie steht unter
+ * Champion, die übrigen Kopien unter MainDeck (zusammen 40).
+ */
+export function deckToArena(deck) {
+  const name = c => c.fullName ?? c.name;
+  const legendName = deck.champion ? `${deck.champion}, ${deck.legend.name}` : deck.legend.name;
+  const isChamp = c => deck.champion && c.type === 'unit' && c.name === deck.champion && c.subtitle;
+  // Als Chosen Champion die Champion-Einheit mit den meisten Kopien
+  const champ = deck.main.filter(m => isChamp(m.card)).sort((a, b) => b.count - a.count)[0];
+  const main = deck.main
+    .map(m => ({ card: m.card, count: m === champ ? m.count - 1 : m.count }))
+    .filter(m => m.count > 0);
+  const lines = list => list.map(m => `${m.count} ${name(m.card)}`).join('\n');
+  return [
+    'Legend:', `1 ${legendName}`,
+    ...(champ ? ['', 'Champion:', `1 ${name(champ.card)}`] : []),
+    '', 'MainDeck:', lines(groupByDomain({ ...deck, main }).flatMap(g => g.cards)),
+    '', 'Battlefields:', lines(deck.battlefields.map(b => ({ card: b.card, count: 1 }))),
+    '', 'Runes:', lines(deck.runes),
+  ].join('\n') + '\n';
+}
+
+/**
  * Decklisten-Export im selben Textformat wie der Import.
  * Die Sammlernummer kommt aus publicCode, damit Runen als #R04 und nicht
  * als #004 herauskommen und der Export wieder einlesbar ist.
