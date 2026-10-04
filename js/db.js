@@ -36,7 +36,8 @@ export async function loadCards() {
 export const key = c => (c.fullName ?? c.name).toLowerCase();
 
 /** Eingabenamen vereinheitlichen: "Kennen - Keeper of Balance" wie "Kennen, Keeper of Balance". */
-const normName = n => String(n ?? '').toLowerCase().replace(/\s+-\s+/, ', ').replace(/\s+/g, ' ').trim();
+// Typografische Apostrophe (’) aus kopierten Webseiten wie ' behandeln.
+const normName = n => String(n ?? '').toLowerCase().replace(/[’‘`´]/g, "'").replace(/\s+-\s+/, ', ').replace(/\s+/g, ' ').trim();
 
 /** publicCode -> Nummern-Token: "UNL-131/219" ergibt 131, "VEN-R04" ergibt R04. */
 function codeToken(card) {
@@ -122,6 +123,13 @@ export function resolve(db, entry) {
   // Tempest"), Exporte stellen den Champion voran.
   const dash = entry.name.split(/\s+-\s+/);
   if (dash.length === 2) return db.byName.get(normName(dash[1])) ?? null;
+  // Deckseiten und TCG Arena schreiben "Kennen, Heart of the Tempest" – nur
+  // gelten lassen, wenn der Rest wirklich eine Legende ist.
+  const comma = normName(entry.name).split(', ');
+  if (comma.length >= 2) {
+    const leg = db.byName.get(comma.slice(1).join(', '));
+    if (leg?.type === 'legend') return leg;
+  }
   return null;
 }
 

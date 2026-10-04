@@ -1,4 +1,4 @@
-import { parseCollection, serializeCollection } from './parser.js';
+import { parseCollection, parseDeckList, serializeCollection } from './parser.js';
 import { loadCards, buildInventory, resolve, key } from './db.js';
 import { suggestDecks, deckToText, deckToArena, deckTitle, checkDeck, championOf, groupByDomain, RULES } from './deckbuilder.js';
 import { buildGuide } from './guide.js';
@@ -65,7 +65,7 @@ function decks() {
  * dem Deckbau nicht, werden im Meta-Tab aber trotzdem ausgewertet.
  */
 function parseMetaList(text) {
-  const { entries } = parseCollection(text);
+  const { entries } = parseDeckList(text);
   const rows = entries.map(e => {
     const found = resolve(state.db, e);
     return { e, card: found ? (state.db.byName.get(key(found)) ?? found) : null };
@@ -74,7 +74,8 @@ function parseMetaList(text) {
   const main = rows.filter(r => r.card && ['unit', 'spell', 'gear'].includes(r.card.type))
     .map(r => ({ card: r.card, count: r.e.qty }));
   const battlefields = rows.filter(r => r.card?.type === 'battlefield').map(r => r.card);
-  return { legend, main, battlefields };
+  const unknown = rows.filter(r => !r.card).map(r => r.e.raw);
+  return { legend, main, battlefields, unknown };
 }
 
 function metaDecks() {
@@ -83,7 +84,8 @@ function metaDecks() {
   const own = read(KEY.meta, []).filter(d => !d.own).map(d => {
     const { legend, main } = parseMetaList(d.text);
     if (!legend) return null;
-    return { name: d.name, legendKey: key(legend), champion: championOf(legend, state.db.cards), cards: countMap(main) };
+    // Selbst hochgeladene Listen sind meist die aktuellsten – sie werden Vorbild.
+    return { name: d.name, weight: 3, legendKey: key(legend), champion: championOf(legend, state.db.cards), cards: countMap(main) };
   }).filter(Boolean);
   return [...builtinMeta(), ...own];
 }
@@ -652,7 +654,13 @@ const lineRow = (n, c, label, warn = []) => `<div class="line"${cv(c)}><span cla
 
 /* --- Meta-Decks --- */
 function analyzeDeck(text) {
-  const { entries } = parseCollection(text);
+  // Nur Hauptdeck (inkl. Champion) zählen – Legende, Runen und Schlachtfelder
+  // stehen in Deckseiten-Listen mit drin, gehören aber nicht zu den 40.
+  const { entries: all } = parseDeckList(text);
+  const entries = all.filter(e => {
+    const c = resolve(state.db, e);
+    return !c || ['unit', 'spell', 'gear'].includes(c.type);
+  });
   const rows = entries.map(e => {
     const found = resolve(state.db, e);
     const card = found ? (state.db.byName.get(key(found)) ?? found) : null;
@@ -670,19 +678,28 @@ function viewMeta() {
 
   return `
     <h2>Meta-Decks</h2>
-    <p class="sub">Deckliste von riftdecks.com, riftbound.gg, riftools.app oder aus einem Turnierbericht einfügen –
-       die App rechnet sofort aus, wie weit du davon entfernt bist und welche Karten dir fehlen.
-       <b>Enthält die Liste eine Legende, fließt sie in den Deckbau ein:</b> Karten, die in Meta-Decks dieser Legende
-       stecken, werden beim Bau deines Decks bevorzugt. Du kannst hier auch dein eigenes Deck einfügen und prüfen lassen.</p>
+    <p class="sub">Eigene Turnierlisten hochladen: Deckliste von riftdecks.com, riftbound.gg, mobalytics, Piltover Archive,
+       TCG Arena oder aus einem Turnierbericht einfügen oder als Textdatei wählen. Die App zeigt, wie weit du davon
+       entfernt bist und welche Karten dir fehlen.
+       <b>Enthält die Liste eine Legende, fließt sie in den Deckbau ein</b> – und zwar bevorzugt: Deine hochgeladene
+       Liste wird zum Vorbild für diese Legende, vor den mitgelieferten Listen.</p>
     <div class="card" style="margin-bottom:20px">
+      <h3 style="margin-top:0">Turnierliste hinzufügen</h3>
+      <p class="sub" style="margin:0 0 10px;font-size:12px">Erkannt werden u. a. „3 Defy“, „3x Defy“, „Defy x3“,
+        „2 Onslaught (VEN) #081“ und Abschnitte wie „Legend:“, „Champion:“, „MainDeck:“, „Battlefields:“, „Runes:“.
+        Das Sideboard wird ignoriert. Ohne Namen benennt die App die Liste nach der Legende.</p>
       <div class="row" style="margin-bottom:10px">
         <input type="text" id="metaName" placeholder="Deckname, z. B. Kennen Tempest (Tier 1)" style="flex:1;min-width:200px">
       </div>
       <label style="display:flex;gap:8px;align-items:flex-start;margin-bottom:10px;font-size:13px;color:var(--dim)">
         <input type="checkbox" id="metaOwn" style="width:auto;flex:none;margin-top:2px"> Mein eigenes Deck – nur prüfen, nicht in den Deckbau einbeziehen
       </label>
-      <textarea id="metaText" placeholder="Deckliste einfügen – gleiches Format wie der Sammlungs-Export"></textarea>
-      <div class="row" style="margin-top:12px"><button class="btn primary" id="addMeta">Deck speichern &amp; auswerten</button></div>
+      <textarea id="metaText" placeholder="Deckliste hier einfügen …"></textarea>
+      <div class="row" style="margin-top:12px">
+        <button class="btn primary" id="addMeta">Liste speichern &amp; auswerten</button>
+        <label class="btn">Textdatei wählen<input type="file" id="metaFile" accept=".txt,.csv,.dek,text/plain" hidden></label>
+      </div>
+      ${state.metaNotice ? `<div class="notice" style="margin-top:12px">${state.metaNotice}</div>` : ''}
     </div>
     ${builtinBlock()}
     <h3>Eigene Listen</h3>
@@ -891,7 +908,7 @@ document.addEventListener('click', async e => {
   const t = e.target.closest('button, [data-card]');
   if (!t) return;
 
-  if (t.dataset.view) { state.view = t.dataset.view; state.deckIdx = null; return render(); }
+  if (t.dataset.view) { state.view = t.dataset.view; state.deckIdx = null; state.metaNotice = null; return render(); }
   if (t.dataset.deck) { state.deckIdx = +t.dataset.deck; return render(); }
   if (t.id === 'backDecks') { state.deckIdx = null; return render(); }
   if (t.dataset.pin) {
@@ -934,9 +951,15 @@ document.addEventListener('click', async e => {
       l.querySelector('.c').textContent.replace('×', '') + ' ' + l.querySelector('.n').childNodes[0].textContent.trim()).join('\n'), t);
   }
   if (t.id === 'addMeta') {
-    const name = $('#metaName').value.trim() || 'Unbenanntes Deck';
     const text = $('#metaText').value.trim();
     if (!text) return;
+    // Rückmeldung: was wurde erkannt? Ohne Namen nach der Legende benennen.
+    const parsed = parseMetaList(text);
+    const cnt = parsed.main.reduce((s, m) => s + m.count, 0);
+    const name = $('#metaName').value.trim()
+      || (parsed.legend ? `${championOf(parsed.legend, state.db.cards) ?? ''} – ${parsed.legend.name}`.replace(/^ – /, '') : 'Unbenanntes Deck');
+    state.metaNotice = `Gespeichert: <b>${esc(name)}</b> – ${parsed.legend ? `Legende ${esc(parsed.legend.name)} erkannt` : '<b>keine Legende erkannt</b> (fließt nicht in den Deckbau ein)'},
+      ${cnt} Hauptdeck-Karten${parsed.unknown.length ? `, <b>${parsed.unknown.length} Zeile(n) nicht erkannt:</b> ${parsed.unknown.slice(0, 5).map(esc).join(' · ')}` : ''}.`;
     const own = $('#metaOwn').checked;
     store(KEY.meta, [...read(KEY.meta, []), { id: String(Date.now()), name, text, own }]);
     state.decks = null;
@@ -984,6 +1007,11 @@ document.addEventListener('change', e => {
   if (e.target.id === 'deckFilter' || e.target.id === 'deckSort') {
     store(KEY.deckView, { ...deckView(), [e.target.id === 'deckFilter' ? 'filter' : 'sort']: e.target.value });
     return render();
+  }
+  if (e.target.id === 'metaFile') {
+    const f = e.target.files?.[0];
+    if (f) f.text().then(txt => { $('#metaText').value = txt; if (!$('#metaName').value) $('#metaName').value = f.name.replace(/\.[^.]+$/, ''); });
+    return;
   }
   if (e.target.id !== 'importFile') return;
   const f = e.target.files?.[0];
