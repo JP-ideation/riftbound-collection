@@ -77,7 +77,9 @@ export function serializeCollection(entries) {
  *   "Battlefields:", "Runes:", "Sideboard:" (auch mit Anzahl dahinter).
  * Das Sideboard wird markiert und zählt nicht zum Deck.
  */
-const SECTION = /^(legend|champion|chosen champion|main ?deck|main|deck|battlefields?|runes?|rune deck|sideboard|side ?deck)\b[^0-9]*?(\(\d+\))?\s*:?\s*(\d+)?\s*$/i;
+const SECTION = /^(legend|champion|chosen champion|main ?deck|main|deck|battlefields?|runes?|rune deck|side ?board|side ?deck)\b[^0-9]*?(\(\d+\))?\s*:?\s*(\d+)?\s*$/i;
+// "1 Vex - Gloomist (UNL-232)" – Set und Nummer gemeinsam in einer Klammer
+const CODE = /^(\d+)\s*x?\s+(.+?)\s+\(([A-Za-z]{2,5})-([A-Za-z0-9*]+)(?:\/\d+)?\)$/i;
 const SIMPLE = /^(\d+)\s*x?\s+(.+?)$/i;
 const TRAILING = /^(.+?)\s+x\s*(\d+)$/i;
 
@@ -90,6 +92,18 @@ export function parseDeckList(text) {
     if (!line || line.startsWith('//') || line.startsWith('#')) return;
     const sec = SECTION.exec(line);
     if (sec && !/^\d/.test(line)) { section = sec[1].toLowerCase().replace(/\s+/g, ''); return; }
+    // Jede andere Überschrift ("Side Board:", "Units:") ist ein Abschnitt, nie eine Karte.
+    if (!/^\d/.test(line) && line.endsWith(':')) { section = line.slice(0, -1).toLowerCase().replace(/\s+/g, ''); return; }
+
+    const code = CODE.exec(line);
+    if (code) {
+      const [, qty, rawName, rawSet, rawNum] = code;
+      const setUpper = rawSet.toUpperCase();
+      const extended = /^[A-Z]{3}X$/.test(setUpper);
+      entries.push({ qty: +qty, name: rawName.replace(NAME_SUFFIX, '').trim(), rawName,
+        set: extended ? setUpper.slice(0, -1) : setUpper, num: rawNum.replace(/\*/g, ''), section, raw: line });
+      return;
+    }
 
     const full = LINE.exec(line);
     if (full) {
