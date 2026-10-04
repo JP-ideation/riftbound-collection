@@ -101,6 +101,38 @@ const countMap = main => {
  * eingefügte Meta-Decks. Karten, die es nicht (mehr) gibt, fallen still raus.
  */
 function builtinMeta() {
+  return [...tournamentMeta(), ...communityMeta()];
+}
+
+/**
+ * Community-Kernliste je Legende aus data/community.json: die Karten, die
+ * die meisten der beliebten Piltover-Archive-Decks spielen, in ihrer
+ * üblichen Kopienzahl, bis 40 Karten. Gilt für Legenden ohne Turnierliste
+ * als Vorbild; wo es Turnierlisten gibt, haben diese Vorrang (Gewicht).
+ */
+function communityMeta() {
+  const legends = state.community?.legends;
+  if (!legends) return [];
+  return Object.entries(legends).map(([legendName, c]) => {
+    const legend = state.db.byName.get(legendName.toLowerCase());
+    if (!legend) return null;
+    const cards = new Map();
+    let total = 0;
+    for (const [name, share, copies] of c.cards) {
+      if (share < 0.25 || total >= 40) break;
+      const card = state.db.byName.get(name.toLowerCase());
+      if (!card || isBanned(card)) continue;
+      const n = Math.min(Math.max(1, Math.round(copies)), 3, 40 - total);
+      cards.set(key(card), n);
+      total += n;
+    }
+    if (total < 20) return null;
+    return { name: `${championOf(legend, state.db.cards) ?? ''} – ${legend.name} · Community-Kern aus ${c.decks} Decks (Piltover Archive)`.replace(/^ – /, ''),
+      weight: 0.6, legendKey: key(legend), champion: championOf(legend, state.db.cards), cards, community: true };
+  }).filter(Boolean);
+}
+
+function tournamentMeta() {
   if (!state.meta) return [];
   return state.meta.decks.map(d => {
     const legend = state.db.byName.get(d.legend.toLowerCase());
@@ -212,9 +244,10 @@ function tile(c, qty, missing = false) {
 const DECK_FILTERS = [
   ['alle', 'Alle'],
   ['komplett', 'Komplett spielbar'],
-  ['turnier', 'Mit Turnierliste'],
+  ['turnier', 'Mit Vorbild-Liste (Turnier oder Community)'],
+  ['nurturnier', 'Nur mit Turnierliste'],
   ['turnier-nah', 'Nah an Turnierliste (≥ 75 % besessen)'],
-  ['ohne', 'Ohne Turnierliste'],
+  ['ohne', 'Ohne Vorbild-Liste'],
   ['tier12', 'Tier 1 und 2 (Tierliste)'],
   ['leicht', 'Schwierigkeit: Einsteiger'],
   ['mittel', 'Schwierigkeit: Mittel'],
@@ -233,6 +266,7 @@ const DECK_FILTER_FN = {
   alle: () => true,
   komplett: d => d.complete,
   turnier: d => !!d.metaRef,
+  nurturnier: d => !!d.metaRef && !d.metaRef.community,
   'turnier-nah': d => (d.metaRef?.owned ?? 0) >= 0.75,
   ohne: d => !d.metaRef,
   tier12: d => (tierOf(d) ?? 9) <= 2,
@@ -306,8 +340,8 @@ function viewDecks() {
             <span class="badge ${d.complete ? 'ok' : 'warn'}">${d.complete ? 'komplett' : 'unvollständig'}</span>
             ${tierBadge(d)}
             ${diffBadge(d)}
-            ${d.metaRef ? `<span class="badge ${d.metaRef.coverage >= 0.75 ? 'ok' : d.metaRef.coverage >= 0.5 ? 'warn' : 'bad'}">Turnierliste ${pct(d.metaRef.coverage, 1)}%</span>`
-              : '<span class="badge bad">ohne Turnierliste</span>'}
+            ${d.metaRef ? `<span class="badge ${d.metaRef.coverage >= 0.75 ? 'ok' : d.metaRef.coverage >= 0.5 ? 'warn' : 'bad'}">${d.metaRef.community ? 'Community-Liste' : 'Turnierliste'} ${pct(d.metaRef.coverage, 1)}%</span>`
+              : '<span class="badge bad">ohne Vorbild-Liste</span>'}
           </div>
         </div>
         <div class="m" style="margin-top:10px">
@@ -416,7 +450,7 @@ function pathBlock(d) {
   const m = d.metaRef;
   if (!m) return '';
   return `<div class="wishbox">
-    <h3 class="wishhead">Weg zur Turnierliste</h3>
+    <h3 class="wishhead">${m.community ? 'Weg zur Community-Liste' : 'Weg zur Turnierliste'}</h3>
     <p class="sub" style="margin:0 0 10px">Ausbauziel, kein Muss: Dein Deck oben ist schon spielbar. Vorbild ist
       <b>${esc(m.name)}</b> – davon besitzt du ${pct(m.owned, 1)}%${m.missing.length ? `, es fehlen ${m.missing.reduce((s, x) => s + x.missing, 0)} Karten` : ''}.</p>
     <div class="lines">${m.missing.map(x => `<div class="line missing"${cv(x.card)}><span class="c">fehlt ${x.missing}×</span>
@@ -757,7 +791,11 @@ function viewMeta() {
  * Vollständigkeit – das Profi-Deck, das du am ehesten bauen kannst, steht oben.
  */
 function builtinBlock() {
-  const list = builtinMeta().map(m => {
+  // Turnierlisten immer, Community-Kernlisten nur für eigene Legenden
+  const comDate = state.community ? new Date(state.community.updated).toISOString().slice(0, 10) : '';
+  const source = [...tournamentMeta(), ...communityMeta().filter(m => state.inv.owned.has(m.legendKey))
+    .map(m => ({ ...m, builtin: { name: m.name, placement: 'Community', date: comDate, source: 'piltoverarchive.com' } }))];
+  const list = source.map(m => {
     const rows = [...m.cards].map(([k, need]) => {
       const card = state.db.byName.get(k);
       const have = Math.min(need, state.inv.owned.get(k)?.qty ?? 0);

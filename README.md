@@ -230,6 +230,17 @@ Mulligan, Stärken und Schwächen. Jede Aussage nennt die Zahl, auf der sie beru
 * **Tierliste:** `tiers` in `data/meta.json` (Quelle riftbound.gg/tier-list,
   mit Datum). Die App zeigt das Tier je Deck an und kann danach sortieren und
   filtern.
+* **Community-Decks (Piltover Archive):** `scripts/fetch-community.mjs`
+  holt je Legende die 40 beliebtesten öffentlichen Decks der letzten 120 Tage
+  über die (inoffizielle, öffentliche) Schnittstelle
+  `piltoverarchive.com/api/external/v1` und zählt, in wie vielen Decks jede
+  Karte steckt → `data/community.json`. Läuft wöchentlich per GitHub Action
+  (`update-community.yml`, montags 05:41 UTC). Ändert Piltover die
+  Schnittstelle, bricht das Skript ab und die alte Datei bleibt.
+  Die App nutzt die Daten dreifach: als schwächeres Signal im Deckbau, als
+  **Community-Kernliste** (Vorbild) für Legenden ohne Turnierliste und für
+  **Ersatzvorschläge** zu fehlenden Karten (gleicher Typ, ähnliche Kosten,
+  Anteil in Community-Decks, Vorkommen in anderen Turnierlisten).
 * **Wöchentliche Aktualisierung:** Eine Claude-Routine recherchiert einmal pro
   Woche Tierliste und neue Turnierlisten, pflegt `scripts/build-meta.py`,
   prüft mit `validate-meta.mjs` und veröffentlicht nur bei bestandener Prüfung.

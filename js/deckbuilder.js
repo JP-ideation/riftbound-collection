@@ -628,6 +628,7 @@ function metaMatch(metaDecks, legend, main, inventory, allCards) {
     const r = { name: d.name ?? 'Turnierliste', coverage: need ? used / need : 0, owned: need ? have / need : 0,
       need, missing: missing.sort((a, b) => b.missing - a.missing), listKeys: new Set(d.cards.keys()) };
     r.weight = d.weight ?? 1;
+    r.community = !!d.community;
     // Vorbild ist die aktuellste Liste; bei gleichem Stand die, von der du am meisten besitzt.
     if (!best || r.weight > best.weight || (r.weight === best.weight && r.owned > best.owned)) best = r;
   }
