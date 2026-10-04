@@ -215,6 +215,7 @@ const DECK_FILTERS = [
   ['turnier', 'Mit Turnierliste'],
   ['turnier-nah', 'Nah an Turnierliste (≥ 75 % besessen)'],
   ['ohne', 'Ohne Turnierliste'],
+  ['tier12', 'Tier 1 und 2 (Tierliste)'],
   ['leicht', 'Schwierigkeit: Einsteiger'],
   ['mittel', 'Schwierigkeit: Mittel'],
   ['schwer', 'Schwierigkeit: Fortgeschritten'],
@@ -224,6 +225,7 @@ const DECK_SORTS = [
   ['turnier', 'Nähe zur Turnierliste'],
   ['besitz', 'Anteil Turnierkarten im Besitz'],
   ['staerke', 'Stärke der Karten'],
+  ['tier', 'Tierliste (Tier 1 zuerst)'],
   ['schwierigkeit', 'Schwierigkeit (leicht zuerst)'],
   ['name', 'Name'],
 ];
@@ -233,6 +235,7 @@ const DECK_FILTER_FN = {
   turnier: d => !!d.metaRef,
   'turnier-nah': d => (d.metaRef?.owned ?? 0) >= 0.75,
   ohne: d => !d.metaRef,
+  tier12: d => (tierOf(d) ?? 9) <= 2,
   leicht: d => d.difficulty.level === 0,
   mittel: d => d.difficulty.level === 1,
   schwer: d => d.difficulty.level === 2,
@@ -243,6 +246,7 @@ const beginnerBonus = d => (deckView().beginner ? (1 - d.difficulty.level) * 1.2
 const DECK_SORT_FN = {
   bewertung: (a, b) => (b.rating + beginnerBonus(b)) - (a.rating + beginnerBonus(a)),
   schwierigkeit: (a, b) => a.difficulty.score - b.difficulty.score || b.rating - a.rating,
+  tier: (a, b) => (tierOf(a) ?? 9) - (tierOf(b) ?? 9) || b.rating - a.rating,
   turnier: (a, b) => (b.metaRef?.coverage ?? -1) - (a.metaRef?.coverage ?? -1) || b.rating - a.rating,
   besitz: (a, b) => (b.metaRef?.owned ?? -1) - (a.metaRef?.owned ?? -1) || b.rating - a.rating,
   staerke: (a, b) => b.score - a.score,
@@ -250,6 +254,9 @@ const DECK_SORT_FN = {
 };
 const deckView = () => ({ filter: 'alle', sort: 'bewertung', beginner: false, ...read(KEY.deckView, {}) });
 const DIFF_CLS = ['ok', 'warn', 'bad'];
+/** Tier der Legende laut mitgelieferter Tierliste (data/meta.json), sonst undefined. */
+const tierOf = d => state.meta?.tiers?.legends?.[d.legend.fullName ?? d.legend.name];
+const tierBadge = d => (tierOf(d) ? `<span class="badge tier t${tierOf(d)}" title="Tierliste ${esc(state.meta.tiers.source)}, Stand ${esc(state.meta.tiers.date)}">Tier ${tierOf(d)}</span>` : '');
 const diffBadge = d => `<span class="badge ${DIFF_CLS[d.difficulty.level]}" title="Schwierigkeit ${num(d.difficulty.score)}/10">${esc(d.difficulty.label)}</span>`;
 const num = x => (Math.round(x * 10) / 10).toString().replace('.', ',');
 
@@ -297,6 +304,7 @@ function viewDecks() {
             <div class="m">${d.champion ? esc(d.legend.name) + ' · ' : ''}${dots(d.identity)} ${d.identity.join(' + ')}</div></div>
           <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end">
             <span class="badge ${d.complete ? 'ok' : 'warn'}">${d.complete ? 'komplett' : 'unvollständig'}</span>
+            ${tierBadge(d)}
             ${diffBadge(d)}
             ${d.metaRef ? `<span class="badge ${d.metaRef.coverage >= 0.75 ? 'ok' : d.metaRef.coverage >= 0.5 ? 'warn' : 'bad'}">Turnierliste ${pct(d.metaRef.coverage, 1)}%</span>`
               : '<span class="badge bad">ohne Turnierliste</span>'}
@@ -322,7 +330,8 @@ function viewDeckDetail(d) {
     <p class="sub">${dots(d.identity)} ${d.identity.join(' + ')} · Bewertung ${(Math.round(d.rating * 10) / 10).toString().replace('.', ',')} (Stärke ${String(d.score).replace('.', ',')}) · Ø ${d.avgEnergy} Energie · nur Karten aus deinem Bestand
       ${d.complete ? '' : ` · es fehlen ${d.missingSlots.main} Hauptdeck-, ${d.missingSlots.runes} Runen- und ${d.missingSlots.battlefields} Schlachtfeldkarten`}
       ${d.hasChampion ? '' : ` · <b>keine Champion-Einheit von ${esc(d.champion)} im Bestand</b> (Pflicht)`}
-      ${d.metaRef ? ` · setzt ${pct(d.metaRef.coverage, 1)}% der Turnierliste um` : ''}</p>
+      ${d.metaRef ? ` · setzt ${pct(d.metaRef.coverage, 1)}% der Turnierliste um` : ''}
+      ${tierOf(d) ? ` · <b>Tier ${tierOf(d)}</b> laut ${esc(state.meta.tiers.source)} (Stand ${new Date(state.meta.tiers.date).toLocaleDateString('de-DE')})` : ''}</p>
 
     ${pinButtons(d)}
     ${d.metaRef && d.metaRef.owned < 0.7 ? `<div class="notice" style="margin-bottom:16px"><b>Nur ${pct(d.metaRef.owned, 1)}% der

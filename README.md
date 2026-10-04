@@ -214,11 +214,25 @@ Mulligan, Stärken und Schwächen. Jede Aussage nennt die Zahl, auf der sie beru
   24.07. und 18.09.2026). Bei jeder neuen Welle Namen und `BANNED_AS_OF`
   anpassen; der Deckbau schließt gebannte Karten und Schlachtfelder aus, der
   Deck-Check markiert sie.
-* **Turnierlisten:** `data/meta.json`, je Deck Legende (`fullName`), Event,
-  Platzierung, Datum, Quelle und Karten `[fullName, Kopien]`. Beim Einpflegen
-  jede Karte gegen `data/cards.json`, die Domain-Identität der Legende und die
-  Bannliste prüfen. Stand der mitgelieferten Listen: Regional Qualifiers der
-  Vendetta-Saison bis September 2026, 16 Legenden.
+* **Turnierlisten:** Quelle ist `scripts/build-meta.py` (Listen als
+  „Anzahl Name; …“, `weight=2` für Listen nach der letzten Bannwelle, `TIERS`
+  für die Tierliste). Das Skript prüft jede Karte gegen `data/cards.json`, die
+  Domain-Identität der Legende und `js/banlist.js` und schreibt
+  `data/meta.json`. Danach immer:
+
+  ```bash
+  python3 scripts/build-meta.py && node scripts/validate-meta.mjs
+  ```
+
+  `validate-meta.mjs` bricht mit Exit-Code 1 ab, wenn eine Karte fehlt, nicht
+  zur Legende passt, gebannt ist oder ein Deck mehr als 40 Karten hat – dann
+  darf nichts veröffentlicht werden.
+* **Tierliste:** `tiers` in `data/meta.json` (Quelle riftbound.gg/tier-list,
+  mit Datum). Die App zeigt das Tier je Deck an und kann danach sortieren und
+  filtern.
+* **Wöchentliche Aktualisierung:** Eine Claude-Routine recherchiert einmal pro
+  Woche Tierliste und neue Turnierlisten, pflegt `scripts/build-meta.py`,
+  prüft mit `validate-meta.mjs` und veröffentlicht nur bei bestandener Prüfung.
 
 ## Grenzen
 

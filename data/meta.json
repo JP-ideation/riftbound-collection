@@ -1,5 +1,28 @@
 {
- "updated": "2026-10-03",
+ "updated": "2026-10-04",
+ "tiers": {
+  "source": "riftbound.gg/tier-list",
+  "date": "2026-10-03",
+  "legends": {
+   "Blade Dancer": 1,
+   "Wuju Bladesman, Starter": 1,
+   "Pridestalker": 2,
+   "Deceiver": 2,
+   "Emperor of the Sands": 2,
+   "Rogue Assassin": 2,
+   "Heart of the Tempest": 2,
+   "Gloomist": 3,
+   "Defender of Tomorrow": 3,
+   "Void Burrower": 3,
+   "Grand Duelist": 3,
+   "Daughter of the Void": 3,
+   "Voidreaver": 3,
+   "Fire Below the Mountain": 3,
+   "Scorn of the Moon": 3,
+   "Purifier": 3,
+   "Prodigal Explorer": 3
+  }
+ },
  "note": "Kernlisten aus Top-8- und Best-Of-Decks der Regional Qualifiers der Vendetta-Saison (Utrecht, Barcelona, Singapur, Sydney, Hartford, Vancouver, Atlanta) und Turniere nach dem Bann vom 18.09. (Kennen: CCS Invitational Qualifier, Convergence #3). Aus öffentlich einsehbaren Turnierberichten übernommen und gegen die offizielle Kartendatenbank, die Domain-Identität der Legende und die Bannliste vom 18.09.2026 geprüft. Listen nach dem Bann zählen doppelt. Teils unvollständig; Sideboards nicht enthalten.",
  "decks": [
   {
@@ -2018,9 +2041,9 @@
   },
   {
    "weight": 1,
-   "name": "Fiora – Grand Duelist · Regional Qualifier Atlanta (VVES)",
+   "name": "Fiora – Grand Duelist · Regional Qualifier Atlanta (VVES) – Quelle nennt 41 Karten, 1× Call to Glory gestrichen",
    "legend": "Grand Duelist",
-   "event": "Regional Qualifier Atlanta (VVES)",
+   "event": "Regional Qualifier Atlanta (VVES) – Quelle nennt 41 Karten, 1× Call to Glory gestrichen",
    "placement": "Best-Of",
    "date": "2026",
    "source": "mobalytics.gg",
@@ -2087,7 +2110,7 @@
     ],
     [
      "Call to Glory",
-     2
+     1
     ]
    ]
   },
@@ -2163,6 +2186,152 @@
     [
      "Riposte",
      3
+    ]
+   ]
+  },
+  {
+   "weight": 1,
+   "name": "Kha'Zix – Voidreaver · Vendetta-Turnierliste (riftdecks.com)",
+   "legend": "Voidreaver",
+   "event": "Vendetta-Turnierliste (riftdecks.com)",
+   "placement": "Top 8",
+   "date": "2026-09",
+   "source": "riftdecks.com",
+   "cards": [
+    [
+     "Kha'Zix, Mutating Horror",
+     1
+    ],
+    [
+     "Baron Nashor",
+     2
+    ],
+    [
+     "Dragonsoul Sage",
+     2
+    ],
+    [
+     "Fizz, Trickster",
+     2
+    ],
+    [
+     "Here to Help",
+     1
+    ],
+    [
+     "Illaoi, Prophet of the Great Kraken",
+     3
+    ],
+    [
+     "Irresistible Faefolk",
+     3
+    ],
+    [
+     "Mister Root",
+     3
+    ],
+    [
+     "Overt Operation",
+     1
+    ],
+    [
+     "Punch First",
+     2
+    ],
+    [
+     "Rampage",
+     2
+    ],
+    [
+     "Rengar, Trophy Hunter",
+     3
+    ],
+    [
+     "Ride the Wind",
+     1
+    ],
+    [
+     "Star-Crossed",
+     2
+    ],
+    [
+     "Switcheroo",
+     1
+    ],
+    [
+     "Up from the Deep",
+     3
+    ],
+    [
+     "Void Assault",
+     3
+    ],
+    [
+     "Zed, Without a Sound",
+     2
+    ]
+   ]
+  },
+  {
+   "weight": 1,
+   "name": "Kai'Sa – Daughter of the Void · Kernkarten aus Top-8-Listen (SCG Vegas 10K, RQ Houston) – Anzahl teils geschätzt",
+   "legend": "Daughter of the Void",
+   "event": "Kernkarten aus Top-8-Listen (SCG Vegas 10K, RQ Houston) – Anzahl teils geschätzt",
+   "placement": "Top 8",
+   "date": "2026",
+   "source": "mobalytics.gg",
+   "cards": [
+    [
+     "Kai'Sa, Survivor",
+     1
+    ],
+    [
+     "Ravenbloom Student",
+     3
+    ],
+    [
+     "Hextech Ray",
+     3
+    ],
+    [
+     "Watchful Sentry",
+     2
+    ],
+    [
+     "Cleave",
+     2
+    ],
+    [
+     "Retreat",
+     2
+    ],
+    [
+     "Stupefy",
+     2
+    ],
+    [
+     "Falling Star",
+     2
+    ],
+    [
+     "Pouty Poro",
+     2
+    ],
+    [
+     "Darius, Trifarian",
+     1
+    ],
+    [
+     "Thousand-Tailed Watcher",
+     2
+    ],
+    [
+     "Smoke Screen",
+     2
+    ],
+    [
+     "Void Seeker",
+     2
     ]
    ]
   }
