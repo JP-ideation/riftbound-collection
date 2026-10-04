@@ -286,6 +286,13 @@ function contextScore(card, env, ctx, count = 1) {
       s += 16 * sub.value;
       why.push({ ok: true, text: `Ersatz für ${sub.for} aus der Turnierliste (ähnliche Rolle)` });
     }
+    // Community: wie viele Spieler dieser Legende die Karte nutzen
+    // (Piltover Archive). Breiter, aber schwächer als Turnierlisten.
+    const com = env.community?.cards.get(key(card));
+    if (com && com.share >= 0.2) {
+      s += 7 * com.share;
+      why.push({ ok: true, text: `In ${Math.round(com.share * 100)} % von ${env.community.decks} Community-Decks dieser Legende` });
+    }
   }
 
   // 4) Eigene Bedarfe: Was die Karte braucht, muss das Deck liefern.
@@ -371,7 +378,7 @@ function metaIndex(metaDecks, legend, inventory) {
 /* ---------------------------------------------------------------- Deckbau */
 
 /** Baut ein Deck für genau eine Legende. */
-export function buildDeck(inventory, legendEntry, allCards, metaDecks = []) {
+export function buildDeck(inventory, legendEntry, allCards, metaDecks = [], community = null) {
   initOnce(allCards);
   const legend = legendEntry.card;
   const identity = new Set((legend.domains ?? []).filter(d => d !== 'colorless'));
@@ -392,6 +399,7 @@ export function buildDeck(inventory, legendEntry, allCards, metaDecks = []) {
     meta: metaIndex(metaDecks, legend, inventory),
   };
   env.subst = substitutes(env.meta, pool, allCards);
+  env.community = communityIndex(community, legend);
 
   // Iterativ: bewerten → Deck bauen → mit dem neuen Deck neu bewerten.
   // Enabler und Verbraucher ziehen sich so gegenseitig ins Deck oder fliegen
@@ -438,9 +446,13 @@ export function buildDeck(inventory, legendEntry, allCards, metaDecks = []) {
   // Stärke OHNE Meta-Bonus: nur so sind Decks verschiedener Legenden
   // vergleichbar. Sonst stünde jede Legende mit Turnierdaten automatisch oben,
   // auch wenn du für eine andere das bessere Deck besitzt.
-  const strength = evaluate(main, { ...env, meta: new Map(), subst: new Map() }, finalCtx);
+  const strength = evaluate(main, { ...env, meta: new Map(), subst: new Map(), community: null }, finalCtx);
   // Abgleich mit genau der Liste, die auch Vorbild war.
   const metaRef = metaMatch(env.meta.primary ? [env.meta.primary] : [], legend, main, inventory, allCards);
+  if (metaRef) {
+    const taken = new Map();
+    for (const m of metaRef.missing) m.suggest = suggestFor(m.card, legal, pool, env.meta, env.community, metaRef.listKeys, taken);
+  }
   if (metaRef) metaRef.lists = metaIndexSize(env.meta);
   // Rangfolge: Was du von einer Turnierliste schon umsetzt, ist erprobt und
   // wiegt mehr als die Heuristik – die schätzt Profi-Entscheidungen um etwa
@@ -526,6 +538,65 @@ function substitutes(meta, pool, allCards) {
   return out;
 }
 
+/** Community-Daten (data/community.json) einer Legende als Map. */
+function communityIndex(community, legend) {
+  const c = community?.legends?.[legend.fullName ?? legend.name];
+  if (!c) return null;
+  return { decks: c.decks, cards: new Map(c.cards.map(([name, share, copies]) => [name.toLowerCase(), { share, copies }])) };
+}
+
+/**
+ * Ersatzvorschläge für eine fehlende Karte – nur aus dem eigenen Bestand.
+ * Datengestützt: Wie oft nutzen Spieler dieser Legende die Karte
+ * (Community-Decks), steht sie in einer anderen Turnierliste der Legende,
+ * und erfüllt sie eine ähnliche Rolle (Typ, Kosten, Funktion)?
+ */
+function suggestFor(missingCard, legal, pool, meta, community, exclude = new Set(), taken = new Map()) {
+  const role = roleOf(missingCard);
+  const scored = pool
+    .filter(o => legal(o.card) && !exclude.has(key(o.card)) && key(o.card) !== key(missingCard)
+      && o.card.type === missingCard.type)                 // Ersatz = gleicher Kartentyp
+    .map(o => {
+      const sim = similarity(role, roleOf(o.card));        // 0, wenn Kosten > 1 auseinander
+      const share = community?.cards.get(key(o.card))?.share ?? 0;
+      const inMeta = meta.has(key(o.card));
+      // Schon für eine andere Lücke vorgeschlagen? Dann nach hinten.
+      const used = (taken.get(key(o.card)) ?? 0) * 0.2;
+      const score = sim * 0.6 + share * 0.5 + (inMeta ? 0.15 : 0) - used;
+      const why = [];
+      if (share >= 0.15) why.push(`in ${Math.round(share * 100)} % der Community-Decks`);
+      if (inMeta) why.push('in einer anderen Turnierliste dieser Legende');
+      if (sim >= 0.45) why.push('ähnliche Rolle');
+      else if (sim > 0) why.push('ähnliche Kosten');
+      return { card: o.card, qty: o.qty, score, why, sim, share };
+    })
+    // Ähnliche Kosten (sim > 0) – oder bei anderen Kosten nur, wenn viele Spieler sie nutzen
+    .filter(x => x.why.length && (x.sim > 0 || x.share >= 0.3))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 2);
+  for (const x of scored) taken.set(key(x.card), (taken.get(key(x.card)) ?? 0) + 1);
+  return scored;
+}
+
+/**
+ * Ersatzvorschläge für eine beliebige Liste (z. B. eine hochgeladene):
+ * je fehlender Karte bis zu zwei eigene Karten.
+ */
+export function suggestReplacements(legend, missing, inventory, allCards, community = null, metaDecks = []) {
+  initOnce(allCards);
+  const names = championNames(allCards);
+  const champion = championOf(legend, allCards);
+  const identity = new Set((legend.domains ?? []).filter(d => d !== 'colorless'));
+  const legal = c => MAIN_TYPES.has(c.type) && !isToken(c) && !isBanned(c) && inIdentity(c, identity)
+    && (() => { const sig = signatureOf(c, names); return !sig || sig === champion; })();
+  const pool = [...inventory.owned.values()].filter(o => legal(o.card));
+  const meta = metaIndex(metaDecks, legend, inventory);
+  const com = communityIndex(community, legend);
+  const exclude = new Set(missing.map(m => key(m.card)));
+  const taken = new Map();
+  return missing.map(m => ({ ...m, suggest: suggestFor(m.card, legal, pool, meta, com, exclude, taken) }));
+}
+
 const metaIndexSize = m => (m.size ? [...m.values()][0].of : 0);
 
 /**
@@ -555,7 +626,7 @@ function metaMatch(metaDecks, legend, main, inventory, allCards) {
       if (own < n) missing.push({ card, need: n, have: own, missing: n - own });
     }
     const r = { name: d.name ?? 'Turnierliste', coverage: need ? used / need : 0, owned: need ? have / need : 0,
-      need, missing: missing.sort((a, b) => b.missing - a.missing) };
+      need, missing: missing.sort((a, b) => b.missing - a.missing), listKeys: new Set(d.cards.keys()) };
     r.weight = d.weight ?? 1;
     // Vorbild ist die aktuellste Liste; bei gleichem Stand die, von der du am meisten besitzt.
     if (!best || r.weight > best.weight || (r.weight === best.weight && r.owned > best.owned)) best = r;
@@ -761,10 +832,10 @@ function canonical(allCards) {
 }
 
 /** Baut Decks für alle besitzbaren Legenden und sortiert nach Stärke. */
-export function suggestDecks(inventory, allCards, metaDecks = []) {
+export function suggestDecks(inventory, allCards, metaDecks = [], community = null) {
   return [...inventory.owned.values()]
     .filter(o => o.card.type === 'legend')
-    .map(l => buildDeck(inventory, l, allCards, metaDecks))
+    .map(l => buildDeck(inventory, l, allCards, metaDecks, community))
     .sort((a, b) => (b.complete - a.complete) || b.rating - a.rating);
 }
 

@@ -179,3 +179,4 @@ table.rules th { color: var(--dim); font-weight: 600; }
 .badge.tier.t1 { background: rgba(212,162,74,.2); color: var(--accent); }
 .badge.tier.t2 { background: rgba(74,159,212,.18); color: var(--accent2); }
 .badge.tier.t3 { background: var(--bg3); color: var(--dim); }
+.line small.suggest { color: var(--ok); font-size: 12px; display: inline-block; margin-top: 3px; line-height: 1.45; }

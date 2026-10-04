@@ -1,6 +1,6 @@
 import { parseCollection, parseDeckList, serializeCollection } from './parser.js';
 import { loadCards, buildInventory, resolve, key } from './db.js';
-import { suggestDecks, deckToText, deckToArena, deckTitle, checkDeck, championOf, groupByDomain, RULES } from './deckbuilder.js';
+import { suggestDecks, suggestReplacements, deckToText, deckToArena, deckTitle, checkDeck, championOf, groupByDomain, RULES } from './deckbuilder.js';
 import { buildGuide } from './guide.js';
 import { isBanned, BANNED_AS_OF } from './banlist.js';
 import { SECTIONS, KEYWORDS, keywordsIn } from './rules.js';
@@ -55,7 +55,7 @@ function applyCollection(text, persist = true) {
 }
 
 function decks() {
-  if (!state.decks) state.decks = suggestDecks(state.inv, state.db.cards, metaDecks());
+  if (!state.decks) state.decks = suggestDecks(state.inv, state.db.cards, metaDecks(), state.community);
   return state.decks;
 }
 
@@ -399,6 +399,19 @@ function deckKeywords(d) {
  * Ausbauziel: Was fehlt dir zur Turnierliste dieser Legende? Das Deck oben
  * ist davon unabhängig – es ist schon jetzt komplett aus deinem Bestand.
  */
+function communityNote(d) {
+  const c = state.community?.legends?.[d.legend.fullName ?? d.legend.name];
+  return c ? `<p class="sub" style="margin:10px 0 0;font-size:12px">Ersatzvorschläge auf Basis von ${c.decks} beliebten
+    Community-Decks dieser Legende (Piltover Archive, Stand ${new Date(state.community.updated).toLocaleDateString('de-DE')})
+    und der Rolle der Karte.</p>` : '';
+}
+
+/** Ersatzvorschläge unter einer fehlenden Karte: eigene Karten mit Begründung. */
+const suggestLine = x => (x.suggest?.length
+  ? `<br><small class="suggest">Ersatz aus deiner Sammlung: ${x.suggest.map(s =>
+      `<span${cv(s.card)}><b>${esc(cname(s.card))}</b> (${s.qty}× · ${esc(s.why.join(', '))})</span>`).join(' oder ')}</small>`
+  : '');
+
 function pathBlock(d) {
   const m = d.metaRef;
   if (!m) return '';
@@ -407,8 +420,9 @@ function pathBlock(d) {
     <p class="sub" style="margin:0 0 10px">Ausbauziel, kein Muss: Dein Deck oben ist schon spielbar. Vorbild ist
       <b>${esc(m.name)}</b> – davon besitzt du ${pct(m.owned, 1)}%${m.missing.length ? `, es fehlen ${m.missing.reduce((s, x) => s + x.missing, 0)} Karten` : ''}.</p>
     <div class="lines">${m.missing.map(x => `<div class="line missing"${cv(x.card)}><span class="c">fehlt ${x.missing}×</span>
-      <span class="n">${esc(cname(x.card))}</span><span class="e">${ident(x.card)} · du hast ${x.have}</span></div>`).join('')
+      <span class="n">${esc(cname(x.card))}${suggestLine(x)}</span><span class="e">${ident(x.card)} · du hast ${x.have}</span></div>`).join('')
       || '<div class="line">Du besitzt alle Karten dieser Liste.</div>'}</div>
+    ${communityNote(d)}
   </div>`;
 }
 
@@ -714,7 +728,12 @@ function viewMeta() {
     <h3>Eigene Listen</h3>
     ${analyses.length ? analyses.map((d, i) => {
       const cls = d.a.pct >= 95 ? 'ok' : d.a.pct >= 75 ? 'warn' : 'bad';
-      const miss = d.a.rows.filter(r => r.missing > 0);
+      const legendForList = parseMetaList(d.text).legend;
+      const missRaw = d.a.rows.filter(r => r.missing > 0);
+      const miss = legendForList
+        ? suggestReplacements(legendForList, missRaw.filter(r => r.card), state.inv, state.db.cards, state.community, metaDecks())
+          .concat(missRaw.filter(r => !r.card))
+        : missRaw;
       return `<div class="card" style="margin-bottom:14px">
         <div class="row" style="justify-content:space-between">
           <div><b>${esc(d.name)}</b>
@@ -726,7 +745,7 @@ function viewMeta() {
         ${metaCheck(d.text, d.own)}
         ${miss.length ? `<h3>Dir fehlen ${d.a.missing} Karten</h3>
           <div class="lines">${miss.map(r => `<div class="line missing"${cv(r.card)}><span class="c">fehlt ${r.missing}×</span>
-            <span class="n">${esc(r.card ? cname(r.card) : r.raw.rawName)}</span>
+            <span class="n">${esc(r.card ? cname(r.card) : r.raw.rawName)}${suggestLine(r)}</span>
             <span class="e">${r.card ? ident(r.card) : 'unbekannte Karte'}</span></div>`).join('')}</div>`
           : '<div class="notice" style="margin-top:12px">Dieses Deck kannst du komplett bauen.</div>'}
       </div>`;
@@ -1033,6 +1052,8 @@ document.addEventListener('change', e => {
   state.db = await loadCards();
   // Turnierlisten sind optional: fehlt die Datei, baut die App ohne Meta-Daten.
   state.meta = await fetch('data/meta.json', { cache: 'no-cache' }).then(r => (r.ok ? r.json() : null)).catch(() => null);
+  // Community-Auswertung (Piltover Archive), ebenfalls optional
+  state.community = await fetch('data/community.json', { cache: 'no-cache' }).then(r => (r.ok ? r.json() : null)).catch(() => null);
   state.inv = { owned: new Map() };
   const saved = read(KEY.coll, null);
   if (saved) applyCollection(saved, false);
