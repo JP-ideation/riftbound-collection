@@ -249,6 +249,7 @@ const DECK_FILTERS = [
   ['turnier-nah', 'Nah an Turnierliste (≥ 75 % besessen)'],
   ['ohne', 'Ohne Vorbild-Liste'],
   ['tier12', 'Tier 1 und 2 (Tierliste)'],
+  ['community', 'Beste Community-Decks (Top 5 / ≥ 50 %)'],
   ['leicht', 'Schwierigkeit: Einsteiger'],
   ['mittel', 'Schwierigkeit: Mittel'],
   ['schwer', 'Schwierigkeit: Fortgeschritten'],
@@ -259,6 +260,7 @@ const DECK_SORTS = [
   ['besitz', 'Anteil Turnierkarten im Besitz'],
   ['staerke', 'Stärke der Karten'],
   ['tier', 'Tierliste (Tier 1 zuerst)'],
+  ['community', 'Nähe zu Community-Decks'],
   ['schwierigkeit', 'Schwierigkeit (leicht zuerst)'],
   ['name', 'Name'],
 ];
@@ -270,6 +272,7 @@ const DECK_FILTER_FN = {
   'turnier-nah': d => (d.metaRef?.owned ?? 0) >= 0.75,
   ohne: d => !d.metaRef,
   tier12: d => (tierOf(d) ?? 9) <= 2,
+  community: d => comFit(d) != null && comFit(d) >= comThreshold(),
   leicht: d => d.difficulty.level === 0,
   mittel: d => d.difficulty.level === 1,
   schwer: d => d.difficulty.level === 2,
@@ -281,11 +284,36 @@ const DECK_SORT_FN = {
   bewertung: (a, b) => (b.rating + beginnerBonus(b)) - (a.rating + beginnerBonus(a)),
   schwierigkeit: (a, b) => a.difficulty.score - b.difficulty.score || b.rating - a.rating,
   tier: (a, b) => (tierOf(a) ?? 9) - (tierOf(b) ?? 9) || b.rating - a.rating,
+  community: (a, b) => (comFit(b) ?? -1) - (comFit(a) ?? -1) || b.rating - a.rating,
   turnier: (a, b) => (b.metaRef?.coverage ?? -1) - (a.metaRef?.coverage ?? -1) || b.rating - a.rating,
   besitz: (a, b) => (b.metaRef?.owned ?? -1) - (a.metaRef?.owned ?? -1) || b.rating - a.rating,
   staerke: (a, b) => b.score - a.score,
   name: (a, b) => (a.champion ?? a.legend.name).localeCompare(b.champion ?? b.legend.name),
 };
+/**
+ * Wie sehr ein Deck den Community-Decks seiner Legende gleicht (0–1):
+ * Ø-Anteil der Community-Decks (Piltover Archive), in denen jede Karte des
+ * Hauptdecks steckt, nach Kopien gewichtet. Nur bei mindestens 10 Decks.
+ */
+const fitCache = new WeakMap();
+function comFit(d) {
+  if (fitCache.has(d)) return fitCache.get(d);
+  const c = state.community?.legends?.[d.legend.fullName ?? d.legend.name];
+  let fit = null;
+  if (c && c.decks >= 10) {
+    const share = new Map(c.cards.map(([n, sh]) => [n.toLowerCase(), sh]));
+    let n = 0, sum = 0;
+    for (const { card, count } of d.main) { n += count; sum += count * (share.get(key(card)) ?? 0); }
+    fit = n ? sum / n : null;
+  }
+  fitCache.set(d, fit);
+  return fit;
+}
+/** Grenze für „Beste Community-Decks“: die 5 ähnlichsten Decks, mindestens aber alle ab 50 %. */
+function comThreshold() {
+  const fits = decks().map(comFit).filter(f => f != null).sort((a, b) => b - a);
+  return fits.length ? Math.min(0.5, fits[Math.min(4, fits.length - 1)]) : Infinity;
+}
 const deckView = () => ({ filter: 'alle', sort: 'bewertung', beginner: false, ...read(KEY.deckView, {}) });
 const DIFF_CLS = ['ok', 'warn', 'bad'];
 /** Tier der Legende laut mitgelieferter Tierliste (data/meta.json), sonst undefined. */
@@ -325,7 +353,8 @@ function viewDecks() {
       <p class="sub" style="margin:10px 0 0;font-size:12px"><b>Bewertung</b> = Stärke der Karten im Zusammenspiel (Motor der Legende,
         erfüllte Bedingungen, Kurve) + Bonus für den umgesetzten Teil der Turnierliste. <b>Schwierigkeit</b> = wie viel das
         Deck vom Spieler verlangt (Timing, Bedingungen, Legenden-Motor) – sie fließt nicht in die Bewertung ein. <b>Turnierliste %</b> = wie viel
-        der Profi-Liste dein Deck enthält. <b>Besitz %</b> = wie viel der Profi-Liste du überhaupt hast.
+        der Profi-Liste dein Deck enthält. <b>Besitz %</b> = wie viel der Profi-Liste du überhaupt hast. <b>Community %</b> = wie typisch deine Karten für die
+        beliebtesten Community-Decks dieser Legende sind (Piltover Archive; 100 % = jede Karte steckt in allen diesen Decks).
         Regeln: 40 Karten, 12 Runen, 3 Schlachtfelder, max. 3 Kopien ([Unique] 1), Champion Pflicht, max. 3 Signature,
         Bannliste Stand ${new Date(BANNED_AS_OF).toLocaleDateString('de-DE')}.</p>
     </div>
@@ -346,7 +375,8 @@ function viewDecks() {
         </div>
         <div class="m" style="margin-top:10px">
           Bewertung <b style="color:var(--accent)">${num(d.rating)}</b> · Stärke ${num(d.score)}
-          ${d.metaRef ? ` · Besitz ${pct(d.metaRef.owned, 1)}%` : ''} ·
+          ${d.metaRef ? ` · Besitz ${pct(d.metaRef.owned, 1)}%` : ''}
+          ${comFit(d) != null ? ` · Community ${pct(comFit(d), 1)}%` : ''} ·
           Ø ${d.avgEnergy} Energie · ${d.counts.main}/40
         </div>
         <div class="bar-track"><div class="bar-fill ${d.metaRef ? (d.metaRef.coverage >= 0.75 ? '' : 'warn') : 'bad'}" style="width:${d.metaRef ? pct(d.metaRef.coverage, 1) : 100}%"></div></div>
