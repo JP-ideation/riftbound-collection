@@ -19,8 +19,10 @@ for c in DB:
 BANNED = set(m.lower() for m in re.findall(r"^\s*['\"](.+?)['\"],", open(os.path.join(ROOT, 'js/banlist.js')).read(), re.M))
 MOBA = 'mobalytics.gg'
 decks = [
- dict(legend='Pridestalker', champion='Rengar', event='Regional Qualifier Barcelona/Singapur (Prismaticism, Sieger RQ Los Angeles)', placement='Top 8', date='2026-09', source='riftmana.com / mobalytics.gg',
-   cards='1 Rengar, Trophy Hunter; 3 Punch First; 2 Sabotage; 3 Inferna; 3 Irresistible Faefolk; 3 Pit Rookie; 3 Thrill of the Hunt; 2 First Mate; 3 Grim Apothecary; 3 Kinkou Initiate; 2 Nidalee, Cat Form; 1 Pakaa Cub; 1 Pyke, Dockside Butcher; 2 Rampage; 3 Kai\'Sa, Survivor; 3 Noxus Hopeful; 1 Darius, Trifarian; 1 Ferrous Forerunner'),
+ dict(legend='Pridestalker', champion='Rengar', event='Regional Qualifier Los Angeles (DSG Prismaticism, 14-0-2) – nach dem Bann', placement='1.', date='2026-09-27', source='riftbound.zone / riftmana.com', weight=2,
+   cards='1 Rengar, Trophy Hunter; 3 Punch First; 3 Sabotage; 3 Inferna; 3 Irresistible Faefolk; 3 Pit Rookie; 2 Thrill of the Hunt; 2 First Mate; 3 Grim Apothecary; 3 Kinkou Initiate; 2 Nidalee, Cat Form; 1 Pakaa Cub; 1 Pyke, Dockside Butcher; 2 Rampage; 3 Kai\'Sa, Survivor; 3 Noxus Hopeful; 1 Darius, Trifarian; 1 Ferrous Forerunner'),
+ dict(legend='Blade Dancer', champion='Irelia', event='Regional Qualifier Los Angeles (Xeno) – nach dem Bann', placement='2.', date='2026-09-27', source='riftbound.gg / riftwatch.gg', weight=2,
+   cards='1 Irelia, Fervent; 1 Abandon; 1 Akali, Silent; 2 Boots of Swiftness; 2 Charm; 3 Defiant Dance; 3 Defy; 3 Discipline; 2 En Garde; 1 Flash; 1 Guardian Angel; 1 Gust; 1 Not So Fast; 1 Pyke, Returned; 2 Ride the Wind; 3 Scuttle Crab; 2 Star-Crossed; 3 Stellacorn Herder; 3 Tideturner; 1 Twilight Shroud; 1 Vex, Apathetic; 2 Zhonya\'s Hourglass'),
  dict(legend='Wuju Bladesman, Starter', champion='Master Yi', event='Regional Qualifier Utrecht (Bakura)', placement='Top 8', date='2026', source=MOBA,
    cards='3 Lonely Poro; 3 Pit Rookie; 3 Scuttle Crab; 3 First Mate; 2 Akshan, Mischievous; 3 Rengar, Trophy Hunter; 2 Ruin Runner; 2 Zhonya\'s Hourglass; 3 Charm; 3 Defy; 2 En Garde; 3 Punch First; 1 Sabotage'),
  dict(legend='Blade Dancer', champion='Irelia', event='Regional Qualifier Singapur (Big Willy Dfoe)', placement='Best-Of', date='2026-09-05', source=MOBA,
@@ -107,8 +109,8 @@ TIERS = {
 }
 for k in TIERS: assert k.lower() in legends, k
 json.dump(dict(
-  updated='2026-10-04',
+  updated='2026-10-05',
   tiers=dict(source='riftbound.gg/tier-list', date='2026-10-03',
              legends={legends[k.lower()]['fullName']: t for k, t in TIERS.items()}),
-  note='Kernlisten aus Top-8- und Best-Of-Decks der Regional Qualifiers der Vendetta-Saison (Utrecht, Barcelona, Singapur, Sydney, Hartford, Vancouver, Atlanta) und Turniere nach dem Bann vom 18.09. (Kennen: CCS Invitational Qualifier, Convergence #3). Aus öffentlich einsehbaren Turnierberichten übernommen und gegen die offizielle Kartendatenbank, die Domain-Identität der Legende und die Bannliste vom 18.09.2026 geprüft. Listen nach dem Bann zählen doppelt. Teils unvollständig; Sideboards nicht enthalten.',
+  note='Kernlisten aus Top-8- und Best-Of-Decks der Regional Qualifiers der Vendetta-Saison (Utrecht, Barcelona, Singapur, Sydney, Hartford, Vancouver, Atlanta, Los Angeles) und Turniere nach dem Bann vom 18.09. (RQ Los Angeles; Kennen: CCS Invitational Qualifier, Convergence #3). Aus öffentlich einsehbaren Turnierberichten übernommen und gegen die offizielle Kartendatenbank, die Domain-Identität der Legende und die Bannliste vom 18.09.2026 geprüft. Listen nach dem Bann zählen doppelt. Teils unvollständig; Sideboards nicht enthalten.',
   decks=out), open(os.path.join(ROOT, 'data/meta.json'),'w'), ensure_ascii=False, indent=1)

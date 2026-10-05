@@ -1,5 +1,5 @@
 {
- "updated": "2026-10-04",
+ "updated": "2026-10-05",
  "tiers": {
   "source": "riftbound.gg/tier-list",
   "date": "2026-10-03",
@@ -23,16 +23,16 @@
    "Prodigal Explorer": 3
   }
  },
- "note": "Kernlisten aus Top-8- und Best-Of-Decks der Regional Qualifiers der Vendetta-Saison (Utrecht, Barcelona, Singapur, Sydney, Hartford, Vancouver, Atlanta) und Turniere nach dem Bann vom 18.09. (Kennen: CCS Invitational Qualifier, Convergence #3). Aus öffentlich einsehbaren Turnierberichten übernommen und gegen die offizielle Kartendatenbank, die Domain-Identität der Legende und die Bannliste vom 18.09.2026 geprüft. Listen nach dem Bann zählen doppelt. Teils unvollständig; Sideboards nicht enthalten.",
+ "note": "Kernlisten aus Top-8- und Best-Of-Decks der Regional Qualifiers der Vendetta-Saison (Utrecht, Barcelona, Singapur, Sydney, Hartford, Vancouver, Atlanta, Los Angeles) und Turniere nach dem Bann vom 18.09. (RQ Los Angeles; Kennen: CCS Invitational Qualifier, Convergence #3). Aus öffentlich einsehbaren Turnierberichten übernommen und gegen die offizielle Kartendatenbank, die Domain-Identität der Legende und die Bannliste vom 18.09.2026 geprüft. Listen nach dem Bann zählen doppelt. Teils unvollständig; Sideboards nicht enthalten.",
  "decks": [
   {
-   "weight": 1,
-   "name": "Rengar – Pridestalker · Regional Qualifier Barcelona/Singapur (Prismaticism, Sieger RQ Los Angeles)",
+   "weight": 2,
+   "name": "Rengar – Pridestalker · Regional Qualifier Los Angeles (DSG Prismaticism, 14-0-2) – nach dem Bann",
    "legend": "Pridestalker",
-   "event": "Regional Qualifier Barcelona/Singapur (Prismaticism, Sieger RQ Los Angeles)",
-   "placement": "Top 8",
-   "date": "2026-09",
-   "source": "riftmana.com / mobalytics.gg",
+   "event": "Regional Qualifier Los Angeles (DSG Prismaticism, 14-0-2) – nach dem Bann",
+   "placement": "1.",
+   "date": "2026-09-27",
+   "source": "riftbound.zone / riftmana.com",
    "cards": [
     [
      "Rengar, Trophy Hunter",
@@ -44,7 +44,7 @@
     ],
     [
      "Sabotage",
-     2
+     3
     ],
     [
      "Inferna",
@@ -60,7 +60,7 @@
     ],
     [
      "Thrill of the Hunt",
-     3
+     2
     ],
     [
      "First Mate",
@@ -105,6 +105,105 @@
     [
      "Ferrous Forerunner",
      1
+    ]
+   ]
+  },
+  {
+   "weight": 2,
+   "name": "Irelia – Blade Dancer · Regional Qualifier Los Angeles (Xeno) – nach dem Bann",
+   "legend": "Blade Dancer",
+   "event": "Regional Qualifier Los Angeles (Xeno) – nach dem Bann",
+   "placement": "2.",
+   "date": "2026-09-27",
+   "source": "riftbound.gg / riftwatch.gg",
+   "cards": [
+    [
+     "Irelia, Fervent",
+     1
+    ],
+    [
+     "Abandon",
+     1
+    ],
+    [
+     "Akali, Silent",
+     1
+    ],
+    [
+     "Boots of Swiftness",
+     2
+    ],
+    [
+     "Charm",
+     2
+    ],
+    [
+     "Defiant Dance",
+     3
+    ],
+    [
+     "Defy",
+     3
+    ],
+    [
+     "Discipline",
+     3
+    ],
+    [
+     "En Garde",
+     2
+    ],
+    [
+     "Flash",
+     1
+    ],
+    [
+     "Guardian Angel",
+     1
+    ],
+    [
+     "Gust",
+     1
+    ],
+    [
+     "Not So Fast",
+     1
+    ],
+    [
+     "Pyke, Returned",
+     1
+    ],
+    [
+     "Ride the Wind",
+     2
+    ],
+    [
+     "Scuttle Crab",
+     3
+    ],
+    [
+     "Star-Crossed",
+     2
+    ],
+    [
+     "Stellacorn Herder",
+     3
+    ],
+    [
+     "Tideturner",
+     3
+    ],
+    [
+     "Twilight Shroud",
+     1
+    ],
+    [
+     "Vex, Apathetic",
+     1
+    ],
+    [
+     "Zhonya's Hourglass",
+     2
     ]
    ]
   },
