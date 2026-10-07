@@ -389,7 +389,7 @@ export function buildDeck(inventory, legendEntry, allCards, metaDecks = [], comm
   // Fremde Signature-Karten sind in diesem Deck schlicht nicht erlaubt.
   const legal = c => MAIN_TYPES.has(c.type) && !isToken(c) && !isBanned(c) && inIdentity(c, identity)
     && (() => { const sig = signatureOf(c, names); return !sig || sig === champion; })();
-  const pool = owned.filter(o => legal(o.card));
+  let pool = owned.filter(o => legal(o.card));
 
   const baseline = mightBaseline(allCards);
   const env = {
@@ -403,9 +403,14 @@ export function buildDeck(inventory, legendEntry, allCards, metaDecks = [], comm
 
   // Iterativ: bewerten → Deck bauen → mit dem neuen Deck neu bewerten.
   // Enabler und Verbraucher ziehen sich so gegenseitig ins Deck oder fliegen
-  // gemeinsam raus. Das beste der Durchläufe gewinnt.
+  // gemeinsam raus. Das beste der Durchläufe gewinnt. Ist im fertigen Deck
+  // eine Karte unspielbar (Pflichtbedingung doch nicht erfüllt), fliegt sie
+  // aus dem Pool und das Deck wird neu gebaut.
+  let best = null;
+  for (let attempt = 0; attempt < 4; attempt++) {
   let ctx = poolContext(pool, legend);
-  let best = null, lastSig = '';
+  let lastSig = '';
+  best = null;
   for (let iter = 0; iter < 8; iter++) {
     const scored = pool
       .map(o => ({ ...o, score: contextScore(o.card, env, ctx, Math.min(o.qty, 2)).score }))
@@ -419,6 +424,10 @@ export function buildDeck(inventory, legendEntry, allCards, metaDecks = [], comm
     lastSig = sig;
     // Gedämpft: halb altes, halb neues Deck, damit nichts hin- und herspringt.
     ctx = blend(ctx, deckCtx);
+  }
+  const bad = new Set(best.main.filter(m => contextScore(m.card, env, best.ctx, m.count).score <= UNPLAYABLE).map(m => key(m.card)));
+  if (!bad.size) break;
+  pool = pool.filter(o => !bad.has(key(o.card)));
   }
 
   const { main, ctx: finalCtx } = best;
@@ -595,6 +604,88 @@ export function suggestReplacements(legend, missing, inventory, allCards, commun
   const exclude = new Set(missing.map(m => key(m.card)));
   const taken = new Map();
   return missing.map(m => ({ ...m, suggest: suggestFor(m.card, legal, pool, meta, com, exclude, taken) }));
+}
+
+/**
+ * Eine feste Liste (z. B. hochgeladen) bewerten, ohne sie umzubauen. Liefert
+ * dieselbe Form wie buildDeck, damit die Deckansicht sie gleich darstellt.
+ * Jede Karte trägt have/missing (Bestand); metaRef beschreibt die Liste selbst:
+ * coverage = owned = Anteil, den du besitzt, missing mit Ersatzvorschlägen.
+ *   list: { name, main: [{card,count}], runes: [{card,count}], battlefields: [card] }
+ */
+export function evaluateList(inventory, legend, list, allCards, community = null, metaDecks = []) {
+  initOnce(allCards);
+  const identity = new Set((legend.domains ?? []).filter(d => d !== 'colorless'));
+  const names = championNames(allCards);
+  const champion = championOf(legend, allCards);
+  const ownQty = c => inventory.owned.get(key(c))?.qty ?? 0;
+  const merged = new Map();
+  for (const { card, count } of list.main) {
+    const hit = merged.get(key(card));
+    if (hit) hit.count += count; else merged.set(key(card), { card, count });
+  }
+  const main = [...merged.values()];
+  const baseline = mightBaseline(allCards);
+  const env = {
+    baseline, names, champion, base: new Map(),
+    legendNeeds: analyze(legend).needs, meta: new Map(), subst: new Map(), community: null,
+  };
+  const ctx = contextOf(main, legend);
+  for (const m of main) {
+    const r = contextScore(m.card, env, ctx, m.count);
+    m.score = Math.round(r.score * 10) / 10;
+    m.why = r.why;
+    m.have = Math.min(m.count, ownQty(m.card));
+    m.missing = m.count - m.have;
+  }
+  main.sort((a, b) => b.score - a.score);
+  const total = main.reduce((s, m) => s + m.count, 0);
+
+  // Runen und Schlachtfelder: aus der Liste, sonst aus dem Bestand ergänzt.
+  const owned = [...inventory.owned.values()];
+  const runes = list.runes?.length ? list.runes.map(r => ({ ...r, have: Math.min(r.count, ownQty(r.card)) }))
+    : buildRunes(owned, identity, main).map(r => ({ ...r, have: r.count, auto: true }));
+  const runeCount = runes.reduce((s, r) => s + r.count, 0);
+  const battlefields = list.battlefields?.length
+    ? list.battlefields.map(card => ({ card, count: 1, have: Math.min(1, ownQty(card)) }))
+    : pickBattlefields(owned, ctx).map(b => ({ ...b, have: 1, auto: true }));
+
+  const curve = {};
+  for (const { card, count } of main) curve[bucket(card.energy)] = (curve[bucket(card.energy)] ?? 0) + count;
+  const hasChampion = !champion || main.some(m => m.card.type === 'unit' && m.card.name === champion && m.card.subtitle);
+
+  // Was fehlt dir, und was aus deinem Bestand könnte es ersetzen?
+  const need = main.reduce((s, m) => s + m.count, 0);
+  const have = main.reduce((s, m) => s + m.have, 0);
+  const missingMain = main.filter(m => m.missing > 0)
+    .map(m => ({ card: m.card, need: m.count, have: m.have, missing: m.missing }))
+    .sort((a, b) => b.missing - a.missing);
+  const metaRef = {
+    name: list.name, coverage: need ? have / need : 0, owned: need ? have / need : 0, need,
+    missing: suggestReplacements(legend, missingMain, inventory, allCards, community, metaDecks),
+    listKeys: new Set(main.map(m => key(m.card))), weight: 3, community: false, imported: true,
+  };
+  const missingOther = runes.reduce((s, r) => s + r.count - r.have, 0) + battlefields.reduce((s, b) => s + 1 - b.have, 0);
+  const complete = total === RULES.MAIN && runeCount === RULES.RUNES && battlefields.length === RULES.BATTLEFIELDS
+    && hasChampion && have === need && missingOther === 0;
+  const strength = evaluate(main, env, ctx);
+
+  const deck = {
+    legend, champion, hasChampion,
+    identity: [...identity], main, runes, battlefields, curve,
+    counts: { main: total, runes: runeCount, battlefields: battlefields.length },
+    missingSlots: { main: RULES.MAIN - total, runes: RULES.RUNES - runeCount, battlefields: RULES.BATTLEFIELDS - battlefields.length },
+    complete,
+    score: Math.round(strength * 10) / 10,
+    rating: strength + 6 * metaRef.owned,
+    metaRef,
+    avgEnergy: Math.round((main.reduce((s, m) => s + (m.card.energy ?? 0) * m.count, 0) / Math.max(total, 1)) * 100) / 100,
+    engine: engineReport(legend, ctx),
+    metaDecks: 0,
+    imported: { name: list.name, missing: need - have + missingOther },
+  };
+  deck.difficulty = difficulty(deck);
+  return deck;
 }
 
 const metaIndexSize = m => (m.size ? [...m.values()][0].of : 0);

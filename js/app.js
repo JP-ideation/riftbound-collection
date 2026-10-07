@@ -1,6 +1,6 @@
 import { parseCollection, parseDeckList, serializeCollection } from './parser.js';
 import { loadCards, buildInventory, resolve, key } from './db.js';
-import { suggestDecks, suggestReplacements, deckToText, deckToArena, deckTitle, checkDeck, championOf, groupByDomain, RULES } from './deckbuilder.js';
+import { suggestDecks, deckToText, deckToArena, deckTitle, checkDeck, championOf, groupByDomain, RULES, evaluateList } from './deckbuilder.js';
 import { buildGuide } from './guide.js';
 import { isBanned, BANNED_AS_OF } from './banlist.js';
 import { SECTIONS, KEYWORDS, keywordsIn } from './rules.js';
@@ -48,16 +48,37 @@ function applyCollection(text, persist = true) {
   const { owned, unmatched } = buildInventory(state.db, entries);
   state.inv = { owned };
   state.unmatched = unmatched;
-  state.decks = null;                       // wird beim Öffnen des Deck-Tabs berechnet
+  state.decks = state.imported = null;                       // wird beim Öffnen des Deck-Tabs berechnet
   state.parseErrors = errors;
   if (persist) store(KEY.coll, text);
   renderHead();
 }
 
 function decks() {
-  if (!state.decks) state.decks = suggestDecks(state.inv, state.db.cards, metaDecks(), state.community);
+  if (!state.decks) state.decks = [...suggestDecks(state.inv, state.db.cards, metaDecks(), state.community), ...importedDecks()];
   return state.decks;
 }
+
+/**
+ * Hochgeladene Listen als eigene Decks – genau so, wie sie hochgeladen
+ * wurden, mit Bestand je Karte und Ersatzvorschlägen für das, was fehlt.
+ */
+function importedDecks() {
+  if (state.imported) return state.imported;
+  const saved = read(KEY.meta, []);
+  const meta = saved.length ? metaDecks() : [];
+  state.imported = saved.map(m => {
+    const { legend, main, battlefields, runes } = parseMetaList(m.text);
+    if (!legend || !main.length) return null;
+    const d = evaluateList(state.inv, legend, { name: m.name, main, runes, battlefields }, state.db.cards, state.community, meta);
+    Object.assign(d.imported, { id: m.id, own: !!m.own });
+    return d;
+  }).filter(Boolean);
+  return state.imported;
+}
+const importedById = id => importedDecks().find(d => d.imported.id === id);
+/** Eindeutige Kennung eines Decks: Legende, bei importierten Listen deren ID. */
+const deckId = d => (d.imported ? 'imp:' + d.imported.id : key(d.legend));
 
 /**
  * Gespeicherte Meta-Decklisten in eine Form bringen, die der Deckbau nutzen
@@ -74,8 +95,9 @@ function parseMetaList(text) {
   const main = rows.filter(r => r.card && ['unit', 'spell', 'gear'].includes(r.card.type))
     .map(r => ({ card: r.card, count: r.e.qty }));
   const battlefields = rows.filter(r => r.card?.type === 'battlefield').map(r => r.card);
+  const runes = rows.filter(r => r.card?.type === 'rune').map(r => ({ card: r.card, count: r.e.qty }));
   const unknown = rows.filter(r => !r.card).map(r => r.e.raw);
-  return { legend, main, battlefields, unknown };
+  return { legend, main, battlefields, runes, unknown };
 }
 
 function metaDecks() {
@@ -243,6 +265,7 @@ function tile(c, qty, missing = false) {
 /** Filter und Sortierung der Deckliste – gemerkt pro Gerät. */
 const DECK_FILTERS = [
   ['alle', 'Alle'],
+  ['importiert', 'Meine importierten Decks'],
   ['komplett', 'Komplett spielbar'],
   ['turnier', 'Mit Vorbild-Liste (Turnier oder Community)'],
   ['nurturnier', 'Nur mit Turnierliste'],
@@ -267,8 +290,9 @@ const DECK_SORTS = [
 const DECK_FILTER_FN = {
   alle: () => true,
   komplett: d => d.complete,
-  turnier: d => !!d.metaRef,
-  nurturnier: d => !!d.metaRef && !d.metaRef.community,
+  importiert: d => !!d.imported,
+  turnier: d => !!d.metaRef && !d.imported,
+  nurturnier: d => !!d.metaRef && !d.metaRef.community && !d.imported,
   'turnier-nah': d => (d.metaRef?.owned ?? 0) >= 0.75,
   ohne: d => !d.metaRef,
   tier12: d => (tierOf(d) ?? 9) <= 2,
@@ -363,19 +387,20 @@ function viewDecks() {
       <button class="deckcard" data-deck="${i}" ${i === best ? 'style="border-color:var(--accent)"' : ''}>
         ${i === best ? '<div class="m" style="color:var(--accent);font-weight:700;margin-bottom:6px">★ Dein stärkstes Deck</div>' : ''}
         <div class="row" style="justify-content:space-between;align-items:flex-start">
-          <div><div class="t">${esc(d.champion ?? d.legend.name)}</div>
-            <div class="m">${d.champion ? esc(d.legend.name) + ' · ' : ''}${dots(d.identity)} ${d.identity.join(' + ')}</div></div>
+          <div><div class="t">${esc(d.imported ? d.imported.name : (d.champion ?? d.legend.name))}</div>
+            <div class="m">${d.imported ? esc(deckTitle(d)) + ' · ' : d.champion ? esc(d.legend.name) + ' · ' : ''}${dots(d.identity)} ${d.identity.join(' + ')}</div></div>
           <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end">
-            <span class="badge ${d.complete ? 'ok' : 'warn'}">${d.complete ? 'komplett' : 'unvollständig'}</span>
+            ${d.imported ? '<span class="badge imp">importiert</span>' : ''}
+            <span class="badge ${d.complete ? 'ok' : 'warn'}">${d.complete ? 'komplett' : d.imported ? `fehlen ${d.imported.missing}` : 'unvollständig'}</span>
             ${tierBadge(d)}
             ${diffBadge(d)}
-            ${d.metaRef ? `<span class="badge ${d.metaRef.coverage >= 0.75 ? 'ok' : d.metaRef.coverage >= 0.5 ? 'warn' : 'bad'}">${d.metaRef.community ? 'Community-Liste' : 'Turnierliste'} ${pct(d.metaRef.coverage, 1)}%</span>`
+            ${d.metaRef ? `<span class="badge ${d.metaRef.coverage >= 0.75 ? 'ok' : d.metaRef.coverage >= 0.5 ? 'warn' : 'bad'}">${d.metaRef.imported ? 'im Besitz' : d.metaRef.community ? 'Community-Liste' : 'Turnierliste'} ${pct(d.metaRef.coverage, 1)}%</span>`
               : '<span class="badge bad">ohne Vorbild-Liste</span>'}
           </div>
         </div>
         <div class="m" style="margin-top:10px">
           Bewertung <b style="color:var(--accent)">${num(d.rating)}</b> · Stärke ${num(d.score)}
-          ${d.metaRef ? ` · Besitz ${pct(d.metaRef.owned, 1)}%` : ''}
+          ${d.metaRef && !d.imported ? ` · Besitz ${pct(d.metaRef.owned, 1)}%` : ''}
           ${comFit(d) != null ? ` · Community ${pct(comFit(d), 1)}%` : ''} ·
           Ø ${d.avgEnergy} Energie · ${d.counts.main}/40
         </div>
@@ -390,19 +415,26 @@ function viewDeckDetail(d) {
 
   return `
     <div class="row" style="margin-bottom:14px"><button class="btn sm" id="backDecks">← Alle Decks</button></div>
-    <h2>${esc(deckTitle(d))} <span class="badge ${d.complete ? 'ok' : 'warn'}">${d.complete ? 'komplett spielbar' : 'unvollständig'}</span></h2>
-    <p class="sub">${dots(d.identity)} ${d.identity.join(' + ')} · Bewertung ${(Math.round(d.rating * 10) / 10).toString().replace('.', ',')} (Stärke ${String(d.score).replace('.', ',')}) · Ø ${d.avgEnergy} Energie · nur Karten aus deinem Bestand
-      ${d.complete ? '' : ` · es fehlen ${d.missingSlots.main} Hauptdeck-, ${d.missingSlots.runes} Runen- und ${d.missingSlots.battlefields} Schlachtfeldkarten`}
-      ${d.hasChampion ? '' : ` · <b>keine Champion-Einheit von ${esc(d.champion)} im Bestand</b> (Pflicht)`}
-      ${d.metaRef ? ` · setzt ${pct(d.metaRef.coverage, 1)}% der Turnierliste um` : ''}
+    <h2>${esc(d.imported ? d.imported.name : deckTitle(d))} <span class="badge ${d.complete ? 'ok' : 'warn'}">${d.complete ? 'komplett spielbar' : d.imported ? `dir fehlen ${d.imported.missing} Karten` : 'unvollständig'}</span></h2>
+    ${d.imported ? `<div class="row" style="margin:-4px 0 10px;gap:8px"><span class="badge imp">importiert</span>
+      <button class="btn sm" data-renmeta="${esc(d.imported.id)}">✏️ Namen ändern</button>
+      <span class="sub" style="margin:0">${esc(deckTitle(d))}</span></div>` : ''}
+    <p class="sub">${dots(d.identity)} ${d.identity.join(' + ')} · Bewertung ${(Math.round(d.rating * 10) / 10).toString().replace('.', ',')} (Stärke ${String(d.score).replace('.', ',')}) · Ø ${d.avgEnergy} Energie · ${d.imported ? 'deine hochgeladene Liste, unverändert' : 'nur Karten aus deinem Bestand'}
+      ${d.complete || d.imported ? '' : ` · es fehlen ${d.missingSlots.main} Hauptdeck-, ${d.missingSlots.runes} Runen- und ${d.missingSlots.battlefields} Schlachtfeldkarten`}
+      ${d.imported && d.counts.main !== 40 ? ` · <b>die Liste hat ${d.counts.main} statt 40 Hauptdeck-Karten</b>` : ''}
+      ${d.hasChampion ? '' : d.imported ? ` · <b>keine Champion-Einheit von ${esc(d.champion)} in der Liste</b> (Pflicht)` : ` · <b>keine Champion-Einheit von ${esc(d.champion)} im Bestand</b> (Pflicht)`}
+      ${d.metaRef ? (d.imported ? ` · du besitzt ${pct(d.metaRef.owned, 1)}% der Liste` : ` · setzt ${pct(d.metaRef.coverage, 1)}% der Turnierliste um`) : ''}
       ${tierOf(d) ? ` · <b>Tier ${tierOf(d)}</b> laut ${esc(state.meta.tiers.source)} (Stand ${new Date(state.meta.tiers.date).toLocaleDateString('de-DE')})` : ''}</p>
 
     ${pinButtons(d)}
-    ${d.metaRef && d.metaRef.owned < 0.7 ? `<div class="notice" style="margin-bottom:16px"><b>Nur ${pct(d.metaRef.owned, 1)}% der
+    ${d.imported ? `<div class="notice" style="margin-bottom:16px"><b>Importierte Liste.</b> Unten steht die ganze Liste;
+      rot markiert sind Karten, die dir fehlen. Unter „Fehlende Karten“ findest du Ersatz aus deiner Sammlung, damit du das Deck
+      schon jetzt nachbauen kannst.</div>` : ''}
+    ${d.metaRef && !d.imported && d.metaRef.owned < 0.7 ? `<div class="notice" style="margin-bottom:16px"><b>Nur ${pct(d.metaRef.owned, 1)}% der
       Turnierliste im Besitz.</b> Das Deck folgt der Liste, so weit deine Karten reichen, und ersetzt den Rest durch Karten mit
       ähnlicher Rolle. Gegen echte Turnierdecks fehlt ihm aber die Kernausstattung – wichtigste fehlende Karten:
       ${d.metaRef.missing.slice(0, 5).map(x => `${x.missing}× ${esc(cname(x.card))}`).join(', ')}. Vollständig unter „Weg zur Turnierliste".</div>` : ''}
-    ${d.metaRef ? '' : `<div class="notice" style="margin-bottom:16px"><b>Ohne Turnierliste gebaut.</b> Für diese Legende liegt keine
+    ${d.metaRef || d.imported ? '' : `<div class="notice" style="margin-bottom:16px"><b>Ohne Turnierliste gebaut.</b> Für diese Legende liegt keine
       Profi-Liste vor – das Deck folgt nur den Kartentexten (Regeln, Motor, Bedingungen). Spielbar, aber nicht turniererprobt.
       Mit einer eingefügten Turnierliste (Tab „Meta-Decks“) wählt die App aus deinen Karten gezielter aus.</div>`}
     ${difficultyBlock(d)}
@@ -413,16 +445,18 @@ function viewDeckDetail(d) {
       <div>
         <h3>Hauptdeck · ${d.counts.main}/40</h3>
         ${groupByDomain(d).map(g => `<h4 class="domhead">${g.domains.map(x => `<span class="dom ${x}"></span>`).join('')} ${esc(g.label)} · ${g.count}</h4>
-        <div class="lines">${g.cards.map(m => lineRow(m.count, m.card, null, (m.why ?? []).filter(w => w.ok === false).map(w => w.text))).join('')}</div>`).join('')}
+        <div class="lines">${g.cards.map(m => lineRow(m.count, m.card, null, (m.why ?? []).filter(w => w.ok === false).map(w => w.text), m.missing ?? 0)).join('')}</div>`).join('')}
         <h3>Energiekurve</h3>
         <div class="curve">${curve}</div>
       </div>
       <div>
         <h3>Legende</h3><div class="lines">${lineRow(1, d.legend, deckTitle(d))}</div>
         <h3>Runen · ${d.counts.runes}/12</h3>
-        <div class="lines">${d.runes.map(m => lineRow(m.count, m.card)).join('')}</div>
+        ${d.runes[0]?.auto ? '<p class="sub" style="margin:0 0 6px">Nicht in der Liste – aus deinem Bestand ergänzt.</p>' : ''}
+        <div class="lines">${d.runes.map(m => lineRow(m.count, m.card, null, [], m.count - (m.have ?? m.count))).join('')}</div>
         <h3>Schlachtfelder · ${d.counts.battlefields}/3</h3>
-        <div class="lines">${d.battlefields.map(m => lineRow(1, m.card)).join('')}</div>
+        ${d.battlefields[0]?.auto ? '<p class="sub" style="margin:0 0 6px">Nicht in der Liste – aus deinem Bestand ergänzt.</p>' : ''}
+        <div class="lines">${d.battlefields.map(m => lineRow(1, m.card, null, [], 1 - (m.have ?? 1))).join('')}</div>
         ${pathBlock(d)}
         <div class="row" style="margin-top:14px">
           <button class="btn primary" id="copyArena">Für TCG Arena kopieren</button>
@@ -480,9 +514,11 @@ function pathBlock(d) {
   const m = d.metaRef;
   if (!m) return '';
   return `<div class="wishbox">
-    <h3 class="wishhead">${m.community ? 'Weg zur Community-Liste' : 'Weg zur Turnierliste'}</h3>
-    <p class="sub" style="margin:0 0 10px">Ausbauziel, kein Muss: Dein Deck oben ist schon spielbar. Vorbild ist
-      <b>${esc(m.name)}</b> – davon besitzt du ${pct(m.owned, 1)}%${m.missing.length ? `, es fehlen ${m.missing.reduce((s, x) => s + x.missing, 0)} Karten` : ''}.</p>
+    <h3 class="wishhead">${m.imported ? 'Fehlende Karten · Ersatz aus deiner Sammlung' : m.community ? 'Weg zur Community-Liste' : 'Weg zur Turnierliste'}</h3>
+    <p class="sub" style="margin:0 0 10px">${m.imported
+      ? `Du besitzt ${pct(m.owned, 1)}% der Hauptdeck-Karten${m.missing.length ? `, es fehlen ${m.missing.reduce((s, x) => s + x.missing, 0)}. Bis du sie hast, kannst du die vorgeschlagenen Karten aus deiner Sammlung spielen` : ''}.`
+      : `Ausbauziel, kein Muss: Dein Deck oben ist schon spielbar. Vorbild ist
+      <b>${esc(m.name)}</b> – davon besitzt du ${pct(m.owned, 1)}%${m.missing.length ? `, es fehlen ${m.missing.reduce((s, x) => s + x.missing, 0)} Karten` : ''}.`}</p>
     <div class="lines">${m.missing.map(x => `<div class="line missing"${cv(x.card)}><span class="c">fehlt ${x.missing}×</span>
       <span class="n">${esc(cname(x.card))}${suggestLine(x)}</span><span class="e">${ident(x.card)} · du hast ${x.have}</span></div>`).join('')
       || '<div class="line">Du besitzt alle Karten dieser Liste.</div>'}</div>
@@ -493,7 +529,7 @@ function pathBlock(d) {
 /* --- Meine Decks (angepinnt) --- */
 const PIN_LABEL = { spiele: 'Spiele ich', baue: 'Baue ich' };
 const pins = () => read(KEY.pins, []);
-const pinOf = legendKey => pins().find(p => p.legendKey === legendKey);
+const pinOf = id => pins().find(p => p.id === id);
 const pinCard = k => state.db.byName.get(k);
 
 /**
@@ -503,7 +539,7 @@ const pinCard = k => state.db.byName.get(k);
  */
 function snapshot(d, status) {
   return {
-    id: key(d.legend), legendKey: key(d.legend), title: deckTitle(d), status, savedAt: Date.now(),
+    id: deckId(d), legendKey: key(d.legend), title: d.imported ? d.imported.name : deckTitle(d), status, savedAt: Date.now(),
     identity: d.identity,
     main: d.main.map(m => [key(m.card), m.count]),
     runes: d.runes.map(r => [key(r.card), r.count]),
@@ -511,16 +547,16 @@ function snapshot(d, status) {
   };
 }
 const sig = list => list.map(([k, n]) => k + n).sort().join();
-const currentDeck = legendKey => decks().find(d => key(d.legend) === legendKey);
-const isOutdated = p => { const d = currentDeck(p.legendKey); return d && sig(p.main) !== sig(d.main.map(m => [key(m.card), m.count])); };
+const currentDeck = id => (id.startsWith('imp:') ? importedById(id.slice(4)) : decks().find(d => !d.imported && key(d.legend) === id));
+const isOutdated = p => { const d = currentDeck(p.id); return d && sig(p.main) !== sig(d.main.map(m => [key(m.card), m.count])); };
 
 function pinButtons(d) {
-  const p = pinOf(key(d.legend));
+  const p = pinOf(deckId(d));
   const btn = (status, label) => `<button class="btn sm ${p?.status === status ? 'primary' : ''}" data-pin="${status}">${label}</button>`;
   return `<div class="row" style="margin:0 0 16px;gap:8px">
     ${btn('spiele', '📌 Spiele ich')} ${btn('baue', '🔧 Baue ich')}
-    ${p ? `<button class="btn sm" data-unpin="${esc(p.legendKey)}">Nicht mehr anpinnen</button>
-      ${isOutdated(p) ? '<button class="btn sm" data-pinupdate="' + esc(p.legendKey) + '">Gespeicherte Version aktualisieren</button>' : ''}` : ''}
+    ${p ? `<button class="btn sm" data-unpin="${esc(p.id)}">Nicht mehr anpinnen</button>
+      ${isOutdated(p) ? '<button class="btn sm" data-pinupdate="' + esc(p.id) + '">Gespeicherte Version aktualisieren</button>' : ''}` : ''}
     ${p ? `<span class="sub" style="margin:0">Gespeichert in „Meine Decks“${isOutdated(p) ? ' – diese Ansicht ist neuer als deine gespeicherte Version' : ''}</span>` : ''}
   </div>`;
 }
@@ -561,9 +597,9 @@ function viewMeine() {
     </div>`;
   };
 
-  const opts = sel => list.map(p => `<option value="${esc(p.legendKey)}" ${p.legendKey === sel ? 'selected' : ''}>${esc(p.title)}</option>`).join('');
+  const opts = sel => list.map(p => `<option value="${esc(p.id)}" ${p.id === sel ? 'selected' : ''}>${esc(p.title)}</option>`).join('');
   const sw = state.swap;
-  const from = list.find(p => p.legendKey === sw.from), to = list.find(p => p.legendKey === sw.to);
+  const from = list.find(p => p.id === sw.from), to = list.find(p => p.id === sw.to);
 
   return `
     <h2>Meine Decks</h2>
@@ -571,20 +607,21 @@ function viewMeine() {
       sie ändert sich nicht von selbst.</p>
     <div class="decklist">${list.map(p => {
       const n = p.main.reduce((s, [, c]) => s + c, 0);
-      const open = state.pinOpen === p.legendKey;
+      const open = state.pinOpen === p.id;
       return `<div class="deckcard" style="cursor:default">
         <div class="row" style="justify-content:space-between;align-items:flex-start">
           <div><div class="t">${esc(p.title)}</div>
-            <div class="m">${dots(p.identity)} ${n} Karten · gespeichert ${new Date(p.savedAt).toLocaleDateString('de-DE')}</div></div>
+            <div class="m">${p.id.startsWith('imp:') ? '<span class="badge imp">importiert</span> ' : ''}${dots(p.identity)} ${n} Karten · gespeichert ${new Date(p.savedAt).toLocaleDateString('de-DE')}</div></div>
           <span class="badge ${p.status === 'spiele' ? 'ok' : 'warn'}">${PIN_LABEL[p.status]}</span>
         </div>
         ${isOutdated(p) ? '<div class="m" style="margin-top:8px;color:var(--warn)">Es gibt eine neuere Version dieses Decks (Sammlung oder Turnierdaten haben sich geändert).</div>' : ''}
         <div class="row" style="margin-top:10px;gap:6px">
-          <button class="btn sm" data-pinopen="${esc(p.legendKey)}">${open ? 'Liste ausblenden' : 'Liste ansehen'}</button>
-          <button class="btn sm" data-pinstatus="${esc(p.legendKey)}">${p.status === 'spiele' ? '→ Baue ich' : '→ Spiele ich'}</button>
-          ${isOutdated(p) ? `<button class="btn sm" data-pinupdate="${esc(p.legendKey)}">Aktualisieren</button>` : ''}
-          <button class="btn sm" data-pinarena="${esc(p.legendKey)}">Für TCG Arena kopieren</button>
-          <button class="btn sm" data-unpin="${esc(p.legendKey)}">Entfernen</button>
+          <button class="btn sm" data-pinopen="${esc(p.id)}">${open ? 'Liste ausblenden' : 'Liste ansehen'}</button>
+          <button class="btn sm" data-pinstatus="${esc(p.id)}">${p.status === 'spiele' ? '→ Baue ich' : '→ Spiele ich'}</button>
+          ${isOutdated(p) ? `<button class="btn sm" data-pinupdate="${esc(p.id)}">Aktualisieren</button>` : ''}
+          ${p.id.startsWith('imp:') ? `<button class="btn sm" data-renmeta="${esc(p.id.slice(4))}">Namen ändern</button>` : ''}
+          <button class="btn sm" data-pinarena="${esc(p.id)}">Für TCG Arena kopieren</button>
+          <button class="btn sm" data-unpin="${esc(p.id)}">Entfernen</button>
         </div>
         ${open ? pinList(p) : ''}
       </div>`;
@@ -735,7 +772,7 @@ function guideBlock(d) {
   </div>`;
 }
 
-const lineRow = (n, c, label, warn = []) => `<div class="line"${cv(c)}><span class="c">${n}×</span><span class="n">${esc(label ?? cname(c))}
+const lineRow = (n, c, label, warn = [], miss = 0) => `<div class="line${miss ? ' missing' : ''}"${cv(c)}><span class="c">${n}×</span><span class="n">${esc(label ?? cname(c))}${miss ? ` <small class="warn">fehlt ${miss}×</small>` : ''}
   ${warn.map(w => `<br><small class="warn">⚠ ${esc(w)}</small>`).join('')}</span>
   <span class="e">${ident(c)}</span></div>`;
 
@@ -792,20 +829,27 @@ function viewMeta() {
     <h3>Eigene Listen</h3>
     ${analyses.length ? analyses.map((d, i) => {
       const cls = d.a.pct >= 95 ? 'ok' : d.a.pct >= 75 ? 'warn' : 'bad';
-      const legendForList = parseMetaList(d.text).legend;
+      const deck = importedById(d.id);
       const missRaw = d.a.rows.filter(r => r.missing > 0);
-      const miss = legendForList
-        ? suggestReplacements(legendForList, missRaw.filter(r => r.card), state.inv, state.db.cards, state.community, metaDecks())
-          .concat(missRaw.filter(r => !r.card))
-        : missRaw;
+      // Ersatzvorschläge kommen aus dem ausgewerteten Deck (gleiche Daten wie im Decks-Tab)
+      const miss = deck ? deck.metaRef.missing.concat(missRaw.filter(r => !r.card)) : missRaw;
       return `<div class="card" style="margin-bottom:14px">
         <div class="row" style="justify-content:space-between">
           <div><b>${esc(d.name)}</b>
             <div class="m" style="font-size:12px;color:var(--dim)">${d.a.have}/${d.a.need} Karten vorhanden</div></div>
-          <div class="row"><span class="badge ${cls}">${d.a.pct}%</span>
-            <button class="btn sm" data-delmeta="${esc(d.id)}">löschen</button></div>
+          <span class="badge ${cls}">${d.a.pct}%</span>
         </div>
         <div class="bar-track"><div class="bar-fill ${cls === 'ok' ? '' : cls}" style="width:${d.a.pct}%"></div></div>
+        <div class="row" style="margin-top:10px;gap:6px">
+          ${deck ? `<button class="btn sm primary" data-openimp="${esc(d.id)}">Als Deck öffnen</button>` : ''}
+          <button class="btn sm" data-renmeta="${esc(d.id)}">✏️ Namen ändern</button>
+          <button class="btn sm" data-delmeta="${esc(d.id)}">löschen</button>
+        </div>
+        <details style="margin-top:10px">
+          <summary style="cursor:pointer;font-weight:600">Ganze Liste anzeigen · ${d.a.have}/${d.a.need} Karten vorhanden</summary>
+          ${deck ? fullList(deck) : `<div class="lines" style="margin-top:8px">${d.a.rows.map(r => r.card ? lineRow(r.need, r.card, null, [], r.missing)
+            : `<div class="line missing"><span class="c">${r.need}×</span><span class="n">${esc(r.raw.rawName)}</span><span class="e">unbekannte Karte</span></div>`).join('')}</div>`}
+        </details>
         ${metaCheck(d.text, d.own)}
         ${miss.length ? `<h3>Dir fehlen ${d.a.missing} Karten</h3>
           <div class="lines">${miss.map(r => `<div class="line missing"${cv(r.card)}><span class="c">fehlt ${r.missing}×</span>
@@ -854,6 +898,18 @@ function builtinBlock() {
         ${miss.length ? '' : '<div class="notice" style="margin-top:10px">Alle gelisteten Karten vorhanden.</div>'}
       </details>`;
     }).join('')}`;
+}
+
+/** Komplette Liste eines (importierten) Decks: Legende, Hauptdeck nach Farbe, Runen, Schlachtfelder – mit Bestand. */
+function fullList(d) {
+  const rows = arr => arr.map(m => lineRow(m.count, m.card, null, [], m.count - (m.have ?? m.count))).join('');
+  return `<div style="margin-top:8px">
+    <h4 class="domhead">Legende</h4><div class="lines">${lineRow(1, d.legend, deckTitle(d))}</div>
+    ${groupByDomain(d).map(g => `<h4 class="domhead">${g.domains.map(x => `<span class="dom ${x}"></span>`).join('')} ${esc(g.label)} · ${g.count}</h4>
+      <div class="lines">${rows(g.cards)}</div>`).join('')}
+    <h4 class="domhead">Runen${d.runes[0]?.auto ? ' (nicht in der Liste – aus deinem Bestand ergänzt)' : ''}</h4><div class="lines">${rows(d.runes)}</div>
+    <h4 class="domhead">Schlachtfelder${d.battlefields[0]?.auto ? ' (nicht in der Liste – aus deinem Bestand ergänzt)' : ''}</h4><div class="lines">${rows(d.battlefields)}</div>
+  </div>`;
 }
 
 /** Deck-Check einer eingefügten Liste: unspielbare Karten, Motor der Legende. */
@@ -1009,17 +1065,17 @@ document.addEventListener('click', async e => {
   if (t.id === 'backDecks') { state.deckIdx = null; return render(); }
   if (t.dataset.pin) {
     const d = decks()[state.deckIdx];
-    store(KEY.pins, [...pins().filter(p => p.legendKey !== key(d.legend)), snapshot(d, t.dataset.pin)]);
+    store(KEY.pins, [...pins().filter(p => p.id !== deckId(d)), snapshot(d, t.dataset.pin)]);
     return render();
   }
-  if (t.dataset.unpin) { store(KEY.pins, pins().filter(p => p.legendKey !== t.dataset.unpin)); return render(); }
+  if (t.dataset.unpin) { store(KEY.pins, pins().filter(p => p.id !== t.dataset.unpin)); return render(); }
   if (t.dataset.pinupdate) {
     const d = currentDeck(t.dataset.pinupdate), old = pinOf(t.dataset.pinupdate);
-    if (d && old) store(KEY.pins, pins().map(p => (p.legendKey === old.legendKey ? snapshot(d, old.status) : p)));
+    if (d && old) store(KEY.pins, pins().map(p => (p.id === old.id ? snapshot(d, old.status) : p)));
     return render();
   }
   if (t.dataset.pinstatus) {
-    store(KEY.pins, pins().map(p => (p.legendKey === t.dataset.pinstatus ? { ...p, status: p.status === 'spiele' ? 'baue' : 'spiele' } : p)));
+    store(KEY.pins, pins().map(p => (p.id === t.dataset.pinstatus ? { ...p, status: p.status === 'spiele' ? 'baue' : 'spiele' } : p)));
     return render();
   }
   if (t.dataset.pinopen) { state.pinOpen = state.pinOpen === t.dataset.pinopen ? null : t.dataset.pinopen; return render(); }
@@ -1031,7 +1087,7 @@ document.addEventListener('click', async e => {
   }
   if (t.id === 'clearColl') {
     localStorage.removeItem(KEY.coll);
-    state.entries = []; state.inv = { owned: new Map() }; state.decks = null; state.unmatched = [];
+    state.entries = []; state.inv = { owned: new Map() }; state.decks = state.imported = null; state.unmatched = [];
     renderHead(); return render();
   }
   if (t.id === 'copyDeck') return copy(deckToText(decks()[state.deckIdx]), t);
@@ -1058,10 +1114,24 @@ document.addEventListener('click', async e => {
       ${cnt} Hauptdeck-Karten${parsed.unknown.length ? `, <b>${parsed.unknown.length} Zeile(n) nicht erkannt:</b> ${parsed.unknown.slice(0, 5).map(esc).join(' · ')}` : ''}.`;
     const own = $('#metaOwn').checked;
     store(KEY.meta, [...read(KEY.meta, []), { id: String(Date.now()), name, text, own }]);
-    state.decks = null;
+    state.decks = state.imported = null;
     return render();
   }
-  if (t.dataset.delmeta) { store(KEY.meta, read(KEY.meta, []).filter(d => d.id !== t.dataset.delmeta)); state.decks = null; return render(); }
+  if (t.dataset.renmeta) {
+    const id = t.dataset.renmeta, saved = read(KEY.meta, []), m = saved.find(x => x.id === id);
+    const name = m && prompt('Neuer Name für das Deck:', m.name)?.trim();
+    if (!name) return;
+    store(KEY.meta, saved.map(x => (x.id === id ? { ...x, name } : x)));
+    store(KEY.pins, pins().map(p => (p.id === 'imp:' + id ? { ...p, title: name } : p)));
+    state.decks = state.imported = null;
+    return render();
+  }
+  if (t.dataset.openimp) {
+    const i = decks().findIndex(d => d.imported?.id === t.dataset.openimp);
+    if (i >= 0) { state.view = 'decks'; state.deckIdx = i; window.scrollTo(0, 0); }
+    return render();
+  }
+  if (t.dataset.delmeta) { store(KEY.meta, read(KEY.meta, []).filter(d => d.id !== t.dataset.delmeta)); state.decks = state.imported = null; return render(); }
   if (t.id === 'addFriend') {
     const name = $('#friendName').value.trim() || 'Freund';
     const text = $('#friendText').value.trim();
