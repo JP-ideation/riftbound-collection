@@ -68,7 +68,7 @@ function importedDecks() {
   const saved = read(KEY.meta, []);
   const meta = saved.length ? metaDecks() : [];
   state.imported = saved.map(m => {
-    const { legend, main, battlefields, runes } = parseMetaList(m.text);
+    const { legend, main, battlefields, runes } = parseMetaList(m.text, m.legend);
     if (!legend || !main.length) return null;
     const d = evaluateList(state.inv, legend, { name: m.name, main, runes, battlefields }, state.db.cards, state.community, meta);
     Object.assign(d.imported, { id: m.id, own: !!m.own });
@@ -85,26 +85,48 @@ const deckId = d => (d.imported ? 'imp:' + d.imported.id : key(d.legend));
  * kann: welche Legende, welche Karten. Listen ohne erkennbare Legende helfen
  * dem Deckbau nicht, werden im Meta-Tab aber trotzdem ausgewertet.
  */
-function parseMetaList(text) {
+function parseMetaList(text, legendKey = null) {
   const { entries } = parseDeckList(text);
   const rows = entries.map(e => {
     const found = resolve(state.db, e);
     return { e, card: found ? (state.db.byName.get(key(found)) ?? found) : null };
   });
-  const legend = rows.find(r => r.card?.type === 'legend')?.card ?? null;
   const main = rows.filter(r => r.card && ['unit', 'spell', 'gear'].includes(r.card.type))
     .map(r => ({ card: r.card, count: r.e.qty }));
+  // Legende: von Hand gewählt > in der Liste > aus dem Champion abgeleitet
+  const listed = rows.find(r => r.card?.type === 'legend')?.card ?? null;
+  const chosen = legendKey ? state.db.byName.get(legendKey) ?? null : null;
+  const legend = chosen ?? listed ?? guessLegend(main);
+  const guessed = !chosen && !listed && !!legend;
   const battlefields = rows.filter(r => r.card?.type === 'battlefield').map(r => r.card);
   const runes = rows.filter(r => r.card?.type === 'rune').map(r => ({ card: r.card, count: r.e.qty }));
   const unknown = rows.filter(r => !r.card).map(r => r.e.raw);
-  return { legend, main, battlefields, runes, unknown };
+  return { legend, guessed, main, battlefields, runes, unknown };
+}
+
+/**
+ * Liste ohne Legendenzeile: Legende aus der Champion-Einheit ableiten – die
+ * Legende dieses Champions, deren Farben die Karten der Liste abdecken.
+ */
+function guessLegend(main) {
+  const champs = new Set(main.filter(m => m.card.type === 'unit' && m.card.subtitle).map(m => m.card.name));
+  const doms = new Set(main.flatMap(m => m.card.domains ?? []).filter(d => d !== 'colorless'));
+  const fits = state.db.cards.filter(c => c.type === 'legend' && !c.variant && champs.has(championOf(c, state.db.cards)))
+    .map(c => {
+      // Bei mehreren passenden Legenden: Wessen Community-Decks gleicht die Liste am meisten?
+      const com = new Map((state.community?.legends?.[c.fullName ?? c.name]?.cards ?? []).map(([n, sh]) => [n.toLowerCase(), sh]));
+      const fit = main.reduce((s, m) => s + m.count * (com.get(key(m.card)) ?? 0), 0);
+      return { c, fit, miss: [...doms].filter(d => !(c.domains ?? []).includes(d)).length };
+    })
+    .sort((a, b) => a.miss - b.miss || b.fit - a.fit);
+  return fits.length && fits[0].miss === 0 ? (state.db.byName.get(key(fits[0].c)) ?? fits[0].c) : null;
 }
 
 function metaDecks() {
   // "Nur prüfen" (eigenes Deck) fließt nicht ein – sonst würde ein schwaches
   // eigenes Deck den Deckbau in seine eigene Richtung ziehen.
   const own = read(KEY.meta, []).filter(d => !d.own).map(d => {
-    const { legend, main } = parseMetaList(d.text);
+    const { legend, main } = parseMetaList(d.text, d.legend);
     if (!legend) return null;
     // Selbst hochgeladene Listen sind meist die aktuellsten – sie werden Vorbild.
     return { name: d.name, weight: 3, legendKey: key(legend), champion: championOf(legend, state.db.cards), cards: countMap(main) };
@@ -338,6 +360,8 @@ function comThreshold() {
   const fits = decks().map(comFit).filter(f => f != null).sort((a, b) => b - a);
   return fits.length ? Math.min(0.5, fits[Math.min(4, fits.length - 1)]) : Infinity;
 }
+const pinRank = d => ({ spiele: 0, baue: 1 })[pinOf(deckId(d))?.status] ?? 2;
+const pinBadge = d => { const p = pinOf(deckId(d)); return p ? `<span class="badge ${p.status === 'spiele' ? 'ok' : 'warn'}">${p.status === 'spiele' ? '📌 Spiele ich' : '🔧 Baue ich'}</span>` : ''; };
 const deckView = () => ({ filter: 'alle', sort: 'bewertung', beginner: false, ...read(KEY.deckView, {}) });
 const DIFF_CLS = ['ok', 'warn', 'bad'];
 /** Tier der Legende laut mitgelieferter Tierliste (data/meta.json), sonst undefined. */
@@ -356,7 +380,8 @@ function viewDecks() {
   const best = list.findIndex(d => d.complete);
   const shown = list.map((d, i) => ({ d, i }))
     .filter(x => (DECK_FILTER_FN[v.filter] ?? DECK_FILTER_FN.alle)(x.d))
-    .sort((x, y) => (y.d.complete - x.d.complete) || (DECK_SORT_FN[v.sort] ?? DECK_SORT_FN.bewertung)(x.d, y.d));
+    // Angepinnte Decks („Spiele ich“, „Baue ich“) stehen immer oben.
+    .sort((x, y) => (pinRank(x.d) - pinRank(y.d)) || (y.d.complete - x.d.complete) || (DECK_SORT_FN[v.sort] ?? DECK_SORT_FN.bewertung)(x.d, y.d));
   const opts = (items, cur) => items.map(([k, l]) => `<option value="${k}" ${k === cur ? 'selected' : ''}>${l}</option>`).join('');
 
   return `
@@ -390,6 +415,7 @@ function viewDecks() {
           <div><div class="t">${esc(d.imported ? d.imported.name : (d.champion ?? d.legend.name))}</div>
             <div class="m">${d.imported ? esc(deckTitle(d)) + ' · ' : d.champion ? esc(d.legend.name) + ' · ' : ''}${dots(d.identity)} ${d.identity.join(' + ')}</div></div>
           <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end">
+            ${pinBadge(d)}
             ${d.imported ? '<span class="badge imp">importiert</span>' : ''}
             <span class="badge ${d.complete ? 'ok' : 'warn'}">${d.complete ? 'komplett' : d.imported ? `fehlen ${d.imported.missing}` : 'unvollständig'}</span>
             ${tierBadge(d)}
@@ -827,6 +853,8 @@ function viewMeta() {
     </div>
     ${builtinBlock()}
     <h3>Eigene Listen</h3>
+    ${analyses.length ? `<p class="sub">Jede Liste mit Legende steht auch im Tab <b>Decks</b> (Filter „Meine importierten Decks“) – mit Bewertung,
+      Spielhilfe und Ersatzvorschlägen. Mit <b>📌 Spiele ich</b> oder <b>🔧 Baue ich</b> steht sie dort ganz oben und in „Meine Decks“.</p>` : ''}
     ${analyses.length ? analyses.map((d, i) => {
       const cls = d.a.pct >= 95 ? 'ok' : d.a.pct >= 75 ? 'warn' : 'bad';
       const deck = importedById(d.id);
@@ -840,8 +868,13 @@ function viewMeta() {
           <span class="badge ${cls}">${d.a.pct}%</span>
         </div>
         <div class="bar-track"><div class="bar-fill ${cls === 'ok' ? '' : cls}" style="width:${d.a.pct}%"></div></div>
+        ${deck ? `<div class="row" style="margin-top:10px;gap:6px;align-items:center">
+          <span class="m" style="font-size:13px">Bewertung <b style="color:var(--accent)">${num(deck.rating)}</b> · Stärke ${num(deck.score)}${comFit(deck) != null ? ` · Community ${pct(comFit(deck), 1)}%` : ''}</span>
+          ${pinBadge(deck)} ${tierBadge(deck)} ${diffBadge(deck)}</div>` : ''}
         <div class="row" style="margin-top:10px;gap:6px">
-          ${deck ? `<button class="btn sm primary" data-openimp="${esc(d.id)}">Als Deck öffnen</button>` : ''}
+          ${deck ? `<button class="btn sm primary" data-openimp="${esc(d.id)}">Als Deck öffnen</button>
+            <button class="btn sm" data-pinimp="${esc(d.id)}" data-status="spiele">📌 Spiele ich</button>
+            <button class="btn sm" data-pinimp="${esc(d.id)}" data-status="baue">🔧 Baue ich</button>` : ''}
           <button class="btn sm" data-renmeta="${esc(d.id)}">✏️ Namen ändern</button>
           <button class="btn sm" data-delmeta="${esc(d.id)}">löschen</button>
         </div>
@@ -850,7 +883,7 @@ function viewMeta() {
           ${deck ? fullList(deck) : `<div class="lines" style="margin-top:8px">${d.a.rows.map(r => r.card ? lineRow(r.need, r.card, null, [], r.missing)
             : `<div class="line missing"><span class="c">${r.need}×</span><span class="n">${esc(r.raw.rawName)}</span><span class="e">unbekannte Karte</span></div>`).join('')}</div>`}
         </details>
-        ${metaCheck(d.text, d.own)}
+        ${metaCheck(d)}
         ${miss.length ? `<h3>Dir fehlen ${d.a.missing} Karten</h3>
           <div class="lines">${miss.map(r => `<div class="line missing"${cv(r.card)}><span class="c">fehlt ${r.missing}×</span>
             <span class="n">${esc(r.card ? cname(r.card) : r.raw.rawName)}${suggestLine(r)}</span>
@@ -913,17 +946,24 @@ function fullList(d) {
 }
 
 /** Deck-Check einer eingefügten Liste: unspielbare Karten, Motor der Legende. */
-function metaCheck(text, own) {
-  const { legend, main, battlefields } = parseMetaList(text);
-  if (!legend) return `<p class="sub" style="margin:10px 0 0">Keine Legende in der Liste erkannt – für Deck-Check und Deckbau
-    muss die Legende mit in der Liste stehen.</p>`;
+function metaCheck(saved) {
+  const own = saved.own;
+  const { legend, guessed, main, battlefields } = parseMetaList(saved.text, saved.legend);
+  // Legende wählen: wenn keine in der Liste steht oder die App sie nur abgeleitet hat
+  const legends = [...new Map(state.db.cards.filter(c => c.type === 'legend' && !c.variant).map(c => [key(c), c])).values()]
+    .sort((a, b) => (championOf(a, state.db.cards) ?? a.name).localeCompare(championOf(b, state.db.cards) ?? b.name));
+  const picker = (guessed || !legend || saved.legend) ? `<label style="display:block;margin-top:10px;font-size:12px;color:var(--dim)">
+    ${!legend ? '<b style="color:var(--bad)">Keine Legende erkannt</b> – bitte wählen:' : guessed ? 'Legende aus dem Champion abgeleitet – falsch? Hier ändern:' : 'Legende (von dir gewählt):'}
+    <select data-legendfor="${esc(saved.id)}"><option value="">–</option>${legends.map(c =>
+      `<option value="${esc(key(c))}" ${legend && key(c) === key(legend) ? 'selected' : ''}>${esc(`${championOf(c, state.db.cards) ?? ''} – ${c.name}`.replace(/^ – /, ''))}</option>`).join('')}</select></label>` : '';
+  if (!legend) return picker;
   const r = checkDeck(legend, main, state.db.cards);
   const engine = r.engine.map(e => `<div class="line" style="display:block"><b>Motor: ${esc(e.text)}</b><br>
     <span class="e">${String(e.have).replace('.', ',')} im Deck (${esc(e.label)}) – ${e.sat >= 0.8 ? 'läuft zuverlässig' : e.sat >= 0.4 ? 'läuft teilweise' : 'zu wenig'}</span></div>`).join('');
   for (const b of battlefields) if (isBanned(b)) r.problems.push({ card: b, count: 1, text: 'Gebanntes Schlachtfeld – im Turnier (Standard) nicht erlaubt' });
   const probs = r.problems.map(p => `<div class="line missing" style="display:block"${cv(p.card)}><b>${p.count}× ${esc(cname(p.card))}</b><br>
     <span class="e">${esc(p.text)}</span></div>`).join('');
-  return `<h3>Deck-Check · ${esc(legend.fullName ?? legend.name)} <span class="tag">${own ? 'nur geprüft' : 'fließt in den Deckbau ein'}</span></h3>
+  return `${picker}<h3>Deck-Check · ${esc(legend.fullName ?? legend.name)} <span class="tag">${own ? 'nur geprüft' : 'fließt in den Deckbau ein'}</span></h3>
     <div class="lines">${engine}${probs || '<div class="line">Keine Karte mit unerfüllter Bedingung.</div>'}</div>`;
 }
 
@@ -1110,7 +1150,7 @@ document.addEventListener('click', async e => {
     const cnt = parsed.main.reduce((s, m) => s + m.count, 0);
     const name = $('#metaName').value.trim()
       || (parsed.legend ? `${championOf(parsed.legend, state.db.cards) ?? ''} – ${parsed.legend.name}`.replace(/^ – /, '') : 'Unbenanntes Deck');
-    state.metaNotice = `Gespeichert: <b>${esc(name)}</b> – ${parsed.legend ? `Legende ${esc(parsed.legend.name)} erkannt` : '<b>keine Legende erkannt</b> (fließt nicht in den Deckbau ein)'},
+    state.metaNotice = `Gespeichert: <b>${esc(name)}</b> – ${parsed.legend ? `Legende ${esc(parsed.legend.name)} ${parsed.guessed ? 'aus dem Champion abgeleitet (unten änderbar)' : 'erkannt'}` : '<b>keine Legende erkannt</b> – unten bei der Liste auswählen'},
       ${cnt} Hauptdeck-Karten${parsed.unknown.length ? `, <b>${parsed.unknown.length} Zeile(n) nicht erkannt:</b> ${parsed.unknown.slice(0, 5).map(esc).join(' · ')}` : ''}.`;
     const own = $('#metaOwn').checked;
     store(KEY.meta, [...read(KEY.meta, []), { id: String(Date.now()), name, text, own }]);
@@ -1124,6 +1164,11 @@ document.addEventListener('click', async e => {
     store(KEY.meta, saved.map(x => (x.id === id ? { ...x, name } : x)));
     store(KEY.pins, pins().map(p => (p.id === 'imp:' + id ? { ...p, title: name } : p)));
     state.decks = state.imported = null;
+    return render();
+  }
+  if (t.dataset.pinimp) {
+    const d = importedById(t.dataset.pinimp);
+    if (d) store(KEY.pins, [...pins().filter(p => p.id !== deckId(d)), snapshot(d, t.dataset.status)]);
     return render();
   }
   if (t.dataset.openimp) {
@@ -1172,6 +1217,15 @@ document.addEventListener('change', e => {
   if (e.target.id === 'deckBeginner') { store(KEY.deckView, { ...deckView(), beginner: e.target.checked }); return render(); }
   if (e.target.id === 'deckFilter' || e.target.id === 'deckSort') {
     store(KEY.deckView, { ...deckView(), [e.target.id === 'deckFilter' ? 'filter' : 'sort']: e.target.value });
+    return render();
+  }
+  if (e.target.dataset?.legendfor) {
+    const id = e.target.dataset.legendfor, legend = e.target.value || null;
+    store(KEY.meta, read(KEY.meta, []).map(x => (x.id === id ? { ...x, legend } : x)));
+    state.decks = state.imported = null;
+    // Angepinnte Fassung auf die neue Legende umstellen
+    const old = pinOf('imp:' + id), d = importedById(id);
+    if (old && d) store(KEY.pins, pins().map(p => (p.id === old.id ? snapshot(d, old.status) : p)));
     return render();
   }
   if (e.target.id === 'metaFile') {
