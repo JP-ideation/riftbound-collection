@@ -5,7 +5,7 @@ import { buildGuide } from './guide.js';
 import { isBanned, BANNED_AS_OF } from './banlist.js';
 import { SECTIONS, KEYWORDS, keywordsIn } from './rules.js';
 
-const KEY = { coll: 'rb.collection.v1', meta: 'rb.metadecks.v1', friends: 'rb.friends.v1', deckView: 'rb.deckview.v1', pins: 'rb.pins.v1' };
+const KEY = { coll: 'rb.collection.v1', meta: 'rb.metadecks.v1', friends: 'rb.friends.v1', deckView: 'rb.deckview.v1', pins: 'rb.pins.v1', trash: 'rb.metatrash.v1' };
 const DOMAINS = ['calm', 'mind', 'body', 'fury', 'order', 'chaos', 'colorless'];
 
 const state = {
@@ -67,12 +67,20 @@ function importedDecks() {
   if (state.imported) return state.imported;
   const saved = read(KEY.meta, []);
   const meta = saved.length ? metaDecks() : [];
+  state.importSkipped = [];
   state.imported = saved.map(m => {
-    const { legend, main, battlefields, runes } = parseMetaList(m.text, m.legend);
-    if (!legend || !main.length) return null;
-    const d = evaluateList(state.inv, legend, { name: m.name, main, runes, battlefields }, state.db.cards, state.community, meta);
-    Object.assign(d.imported, { id: m.id, own: !!m.own });
-    return d;
+    // Eine kaputte Liste darf die anderen nicht mitreißen – sie wird gemeldet, nicht versteckt.
+    try {
+      const { legend, main, battlefields, runes } = parseMetaList(m.text, m.legend);
+      if (!legend || !main.length) { state.importSkipped.push({ m, why: !legend ? 'keine Legende erkannt' : 'keine Hauptdeck-Karten erkannt' }); return null; }
+      const d = evaluateList(state.inv, legend, { name: m.name, main, runes, battlefields }, state.db.cards, state.community, meta);
+      Object.assign(d.imported, { id: m.id, own: !!m.own });
+      return d;
+    } catch (err) {
+      console.warn('Liste nicht auswertbar:', m.name, err);
+      state.importSkipped.push({ m, why: 'Auswertung fehlgeschlagen' });
+      return null;
+    }
   }).filter(Boolean);
   return state.imported;
 }
@@ -407,6 +415,8 @@ function viewDecks() {
         Regeln: 40 Karten, 12 Runen, 3 Schlachtfelder, max. 3 Kopien ([Unique] 1), Champion Pflicht, max. 3 Signature,
         Bannliste Stand ${new Date(BANNED_AS_OF).toLocaleDateString('de-DE')}.</p>
     </div>
+    ${state.importSkipped?.length ? `<div class="notice" style="margin-bottom:12px"><b>${state.importSkipped.length} eigene Liste(n) nicht in der Deckliste:</b>
+      ${state.importSkipped.map(x => `„${esc(x.m.name)}“ (${esc(x.why)})`).join(', ')}. Im Tab „Meta-Decks“ die Legende auswählen, dann erscheint sie hier.</div>` : ''}
     <p class="sub">${shown.length} von ${list.length} Decks</p>
     <div class="decklist">${shown.map(({ d, i }) => `
       <button class="deckcard" data-deck="${i}" ${i === best ? 'style="border-color:var(--accent)"' : ''}>
@@ -671,6 +681,15 @@ function viewMeine() {
     </div>${from && to && from !== to ? swapPlan(from, to, list) : ''}</div>` : ''}`;
 }
 
+/** Angepinnte Fassung als Textliste – zum Wiederherstellen einer gelöschten Liste. */
+function pinToText(p) {
+  const name = k => cname(pinCard(k) ?? { name: k });
+  return [`1 ${name(p.legendKey)}`, ...p.main.map(([k, n]) => `${n} ${name(k)}`),
+    ...p.runes.map(([k, n]) => `${n} ${name(k)}`), ...p.battlefields.map(k => `1 ${name(k)}`)].join('\n');
+}
+/** Angepinnte importierte Decks, deren Liste nicht mehr gespeichert ist. */
+const orphanPins = () => { const ids = new Set(read(KEY.meta, []).map(m => 'imp:' + m.id)); return pins().filter(p => p.id.startsWith('imp:') && !ids.has(p.id)); };
+
 /** Angepinnte Momentaufnahme zurück in Deck-Form (für den Export). */
 function pinAsDeck(p) {
   const legend = pinCard(p.legendKey);
@@ -853,6 +872,9 @@ function viewMeta() {
     </div>
     ${builtinBlock()}
     <h3>Eigene Listen</h3>
+    ${orphanPins().length ? `<div class="notice" style="margin-bottom:12px"><b>Liste fehlt, ist aber in „Meine Decks“ gespeichert:</b>
+      ${orphanPins().map(p => `<div class="row" style="margin-top:6px;gap:8px"><span>${esc(p.title)}</span>
+        <button class="btn sm primary" data-restorepin="${esc(p.id)}">Wiederherstellen</button></div>`).join('')}</div>` : ''}
     ${analyses.length ? `<p class="sub">Jede Liste mit Legende steht auch im Tab <b>Decks</b> (Filter „Meine importierten Decks“) – mit Bewertung,
       Spielhilfe und Ersatzvorschlägen. Mit <b>📌 Spiele ich</b> oder <b>🔧 Baue ich</b> steht sie dort ganz oben und in „Meine Decks“.</p>` : ''}
     ${analyses.length ? analyses.map((d, i) => {
@@ -890,7 +912,11 @@ function viewMeta() {
             <span class="e">${r.card ? ident(r.card) : 'unbekannte Karte'}</span></div>`).join('')}</div>`
           : '<div class="notice" style="margin-top:12px">Dieses Deck kannst du komplett bauen.</div>'}
       </div>`;
-    }).join('') : '<div class="empty">Noch keine Meta-Decks gespeichert.</div>'}`;
+    }).join('') : '<div class="empty">Noch keine Meta-Decks gespeichert.</div>'}
+    ${read(KEY.trash, []).length ? `<details class="card" style="margin-top:16px"><summary style="cursor:pointer;font-weight:600">Zuletzt gelöscht · ${read(KEY.trash, []).length}</summary>
+      <div class="lines" style="margin-top:8px">${read(KEY.trash, []).map(m => `<div class="line"><span class="n">${esc(m.name)}
+        <small class="sub">gelöscht ${new Date(m.deletedAt).toLocaleDateString('de-DE')}</small></span>
+        <button class="btn sm" data-restoremeta="${esc(m.id)}">Wiederherstellen</button></div>`).join('')}</div></details>` : ''}`;
 }
 
 /**
@@ -1044,6 +1070,17 @@ function viewTeilen() {
         </div>
       </div>
       <div class="card">
+        <h3 style="margin-top:0">Eigene Decks sichern</h3>
+        <p class="sub" style="margin:0 0 10px">Hochgeladene Listen und „Meine Decks“ liegen nur im Speicher dieses Browsers. Auf dem
+          iPhone sind Safari und die App auf dem Homebildschirm getrennt, und Safari löscht Daten von Seiten, die man länger
+          nicht geöffnet hat. Sichere deine Decks deshalb ab und zu als Datei.</p>
+        <div class="row">
+          <button class="btn primary" id="dlBackup">Sicherung herunterladen</button>
+          <label class="btn">Sicherung laden<input type="file" id="backupFile" accept=".json,application/json" hidden></label>
+        </div>
+        ${state.backupNotice ? `<div class="notice" style="margin-top:10px">${state.backupNotice}</div>` : ''}
+      </div>
+      <div class="card">
         <h3 style="margin-top:0">Sammlung eines Freundes hinzufügen</h3>
         <input type="text" id="friendName" placeholder="Name" style="margin-bottom:10px">
         <textarea id="friendText" placeholder="Sammlung des Freundes einfügen…" style="min-height:120px"></textarea>
@@ -1176,7 +1213,35 @@ document.addEventListener('click', async e => {
     if (i >= 0) { state.view = 'decks'; state.deckIdx = i; window.scrollTo(0, 0); }
     return render();
   }
-  if (t.dataset.delmeta) { store(KEY.meta, read(KEY.meta, []).filter(d => d.id !== t.dataset.delmeta)); state.decks = state.imported = null; return render(); }
+  if (t.dataset.delmeta) {
+    const saved = read(KEY.meta, []), m = saved.find(d => d.id === t.dataset.delmeta);
+    if (!m || !confirm(`„${m.name}“ löschen? Du kannst sie danach unter „Zuletzt gelöscht“ wiederherstellen.`)) return;
+    store(KEY.trash, [{ ...m, deletedAt: Date.now() }, ...read(KEY.trash, [])].slice(0, 30));
+    store(KEY.meta, saved.filter(d => d.id !== m.id));
+    state.decks = state.imported = null; return render();
+  }
+  if (t.dataset.restoremeta) {
+    const trash = read(KEY.trash, []), m = trash.find(d => d.id === t.dataset.restoremeta);
+    if (m) {
+      const { deletedAt, ...list } = m;
+      store(KEY.meta, [...read(KEY.meta, []).filter(d => d.id !== list.id), list]);
+      store(KEY.trash, trash.filter(d => d.id !== list.id));
+    }
+    state.decks = state.imported = null; return render();
+  }
+  if (t.dataset.restorepin) {
+    const p = pinOf(t.dataset.restorepin), id = p?.id.slice(4);
+    // Original aus „Zuletzt gelöscht“ bevorzugen, sonst aus der angepinnten Fassung neu aufbauen
+    const trash = read(KEY.trash, []), orig = trash.find(d => d.id === id);
+    if (orig) { const { deletedAt, ...list } = orig; store(KEY.meta, [...read(KEY.meta, []), list]); store(KEY.trash, trash.filter(d => d.id !== id)); }
+    else if (p) store(KEY.meta, [...read(KEY.meta, []), { id, name: p.title, text: pinToText(p), own: false, legend: p.legendKey }]);
+    state.decks = state.imported = null; return render();
+  }
+  if (t.id === 'dlBackup') {
+    const data = { app: 'riftbound-collection', version: 1, savedAt: new Date().toISOString(),
+      lists: read(KEY.meta, []), pins: pins(), trash: read(KEY.trash, []) };
+    return download(`riftbound-decks-${data.savedAt.slice(0, 10)}.json`, JSON.stringify(data, null, 1));
+  }
   if (t.id === 'addFriend') {
     const name = $('#friendName').value.trim() || 'Freund';
     const text = $('#friendText').value.trim();
@@ -1227,6 +1292,25 @@ document.addEventListener('change', e => {
     const old = pinOf('imp:' + id), d = importedById(id);
     if (old && d) store(KEY.pins, pins().map(p => (p.id === old.id ? snapshot(d, old.status) : p)));
     return render();
+  }
+  if (e.target.id === 'backupFile') {
+    const f = e.target.files?.[0];
+    if (f) f.text().then(txt => {
+      try {
+        const data = JSON.parse(txt);
+        if (data.app !== 'riftbound-collection' || !Array.isArray(data.lists)) throw new Error('keine Sicherung dieser App');
+        // Zusammenführen statt Überschreiben: vorhandene Listen bleiben, fehlende kommen dazu.
+        const lists = read(KEY.meta, []), ids = new Set(lists.map(m => m.id));
+        const addLists = data.lists.filter(m => !ids.has(m.id));
+        const pinIds = new Set(pins().map(p => p.id));
+        const addPins = (data.pins ?? []).filter(p => !pinIds.has(p.id));
+        store(KEY.meta, [...lists, ...addLists]);
+        store(KEY.pins, [...pins(), ...addPins]);
+        state.backupNotice = `Sicherung geladen: ${addLists.length} Liste(n) und ${addPins.length} angepinnte(s) Deck(s) hinzugefügt.`;
+      } catch (err) { state.backupNotice = `Datei nicht lesbar: ${esc(err.message)}`; }
+      state.decks = state.imported = null; render();
+    });
+    return;
   }
   if (e.target.id === 'metaFile') {
     const f = e.target.files?.[0];
