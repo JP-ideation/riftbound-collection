@@ -541,9 +541,11 @@ function communityNote(d) {
 }
 
 /** Ersatzvorschläge unter einer fehlenden Karte: eigene Karten mit Begründung. */
+/** Wie viele Kopien eines Ersatzes du noch frei hast (nicht schon im Deck). */
+const freeText = s => `${s.free}× frei${s.inDeck ? `, ${s.inDeck}× schon im Deck` : ''}`;
 const suggestLine = x => (x.suggest?.length
   ? `<br><small class="suggest">Ersatz aus deiner Sammlung: ${x.suggest.map(s =>
-      `<span${cv(s.card)}><b>${esc(cname(s.card))}</b> (${s.qty}× · ${esc(s.why.join(', '))})</span>`).join(' oder ')}</small>`
+      `<span${cv(s.card)}><b>${esc(cname(s.card))}</b> (${freeText(s)} · ${esc(s.why.join(', '))})</span>`).join(' oder ')}</small>`
   : '');
 
 function pathBlock(d) {
@@ -745,10 +747,24 @@ function swapPlan(from, to, list) {
       <div class="lines">${blocked.map(x => line(x, 'aus einem anderen Deck holen')).join('')}</div>` : ''}`;
 }
 
+/** Fehlt die angetippte Karte im gerade offenen Deck? Dann ihr Eintrag mit Ersatzvorschlägen. */
+function missingEntry(c, el) {
+  const ctx = el.closest('[data-impctx]');
+  const d = ctx ? importedById(ctx.dataset.impctx)
+    : state.view === 'decks' && state.deckIdx != null ? decks()[state.deckIdx] : null;
+  return d?.metaRef?.missing.find(x => key(x.card) === key(c)) ?? null;
+}
+
 /* --- Kartenansicht --- */
 /** Großes Kartenbild mit Text – per Tipp auf eine Kartenzeile oder Kachel. */
-function showCard(c) {
+function showCard(c, miss = null) {
   closeCard();
+  // Fehlende Karte im Deck: gleich die passenden Ersatzkarten mit anzeigen
+  const sub = miss ? `<div class="cm-sub"><b>Dir fehlen ${miss.missing}× – Ersatz aus deiner Sammlung</b>
+    ${miss.suggest?.length ? `<div class="lines" style="margin-top:6px">${miss.suggest.map(s => `<div class="line"${cv(s.card)}>
+      <span class="n"><b>${esc(cname(s.card))}</b><br><small class="suggest">${esc(freeText(s))} · ${esc(s.why.join(', '))}</small></span>
+      <span class="e">${ident(s.card)}</span></div>`).join('')}</div>`
+      : '<div class="e" style="margin-top:4px">Kein passender Ersatz in deiner Sammlung – alle ähnlichen Karten stecken schon im Deck.</div>'}</div>` : '';
   const own = state.inv?.owned.get((c.fullName ?? c.name).toLowerCase())?.qty ?? 0;
   const el = document.createElement('div');
   el.id = 'cardModal';
@@ -760,6 +776,7 @@ function showCard(c) {
       <div class="e">${ident(c)}${c.might != null ? ` · ${c.might} Might` : ''} · ${esc(c.type)} · ${esc(c.rarity)}</div>
       <div class="e">Du besitzt ${own}×</div>
       ${c.text ? `<p class="cm-text">${esc(c.text)}</p>` : ''}
+      ${sub}
     </div></div>`;
   document.body.appendChild(el);
 }
@@ -883,7 +900,7 @@ function viewMeta() {
       const missRaw = d.a.rows.filter(r => r.missing > 0);
       // Ersatzvorschläge kommen aus dem ausgewerteten Deck (gleiche Daten wie im Decks-Tab)
       const miss = deck ? deck.metaRef.missing.concat(missRaw.filter(r => !r.card)) : missRaw;
-      return `<div class="card" style="margin-bottom:14px">
+      return `<div class="card" style="margin-bottom:14px"${deck ? ` data-impctx="${esc(d.id)}"` : ''}>
         <div class="row" style="justify-content:space-between">
           <div><b>${esc(d.name)}</b>
             <div class="m" style="font-size:12px;color:var(--dim)">${d.a.have}/${d.a.need} Karten vorhanden</div></div>
@@ -1121,13 +1138,17 @@ async function copy(text, btn) {
 document.addEventListener('click', async e => {
   // Kartenbild: schließen per ×, Tipp daneben; öffnen per Tipp auf eine Karte
   if (document.getElementById('cardModal')) {
-    if (e.target.id === 'cardClose' || e.target.id === 'cardModal') closeCard();
+    if (e.target.id === 'cardClose' || e.target.id === 'cardModal') return closeCard();
+    // Tipp auf einen Ersatzvorschlag im Kartenfenster: dessen Bild zeigen
+    const sv = e.target.closest('#cardModal [data-cardview]');
+    const sc = sv && state.db.byName.get(sv.dataset.cardview);
+    if (sc) showCard(sc);
     return;
   }
   const view = e.target.closest('[data-cardview]');
   if (view && !e.target.closest('button, a, input, select')) {
     const c = state.db.byName.get(view.dataset.cardview);
-    if (c) return showCard(c);
+    if (c) return showCard(c, missingEntry(c, view));
   }
   const tileEl = e.target.closest('.tile[data-card]');
   if (tileEl) {

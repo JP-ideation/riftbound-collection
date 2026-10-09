@@ -174,6 +174,8 @@ table.rules th { color: var(--dim); font-weight: 600; }
 .cm-info { margin-top: 10px; font-size: 14px; }
 .cm-info .e { color: var(--dim); font-size: 12.5px; margin-top: 3px; }
 .cm-text { white-space: pre-line; margin: 10px 0 0; font-size: 13.5px; line-height: 1.5; }
+.cm-sub { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line, #30363d); }
+.cm-sub .line { cursor: pointer; }
 .cm-close { position: absolute; top: 8px; right: 8px; width: 36px; height: 36px; border-radius: 50%;
   border: 0; background: rgba(0,0,0,.7); color: #fff; font-size: 22px; line-height: 1; cursor: pointer; z-index: 1; }
 .badge.tier.t1 { background: rgba(212,162,74,.2); color: var(--accent); }
