@@ -1,5 +1,5 @@
 {
- "updated": "2026-10-05",
+ "updated": "2026-10-12",
  "tiers": {
   "source": "riftbound.gg/tier-list",
   "date": "2026-10-03",
@@ -23,7 +23,7 @@
    "Prodigal Explorer": 3
   }
  },
- "note": "Kernlisten aus Top-8- und Best-Of-Decks der Regional Qualifiers der Vendetta-Saison (Utrecht, Barcelona, Singapur, Sydney, Hartford, Vancouver, Atlanta, Los Angeles) und Turniere nach dem Bann vom 18.09. (RQ Los Angeles; Kennen: CCS Invitational Qualifier, Convergence #3). Aus öffentlich einsehbaren Turnierberichten übernommen und gegen die offizielle Kartendatenbank, die Domain-Identität der Legende und die Bannliste vom 18.09.2026 geprüft. Listen nach dem Bann zählen doppelt. Teils unvollständig; Sideboards nicht enthalten.",
+ "note": "Kernlisten aus Top-8- und Best-Of-Decks der Regional Qualifiers der Vendetta-Saison (Utrecht, Barcelona, Singapur, Sydney, Hartford, Vancouver, Atlanta, Los Angeles) und Turniere nach dem Bann vom 18.09. (RQ Los Angeles: Rengar, Irelia, Azir; Kennen: CCS Invitational Qualifier, Convergence #3). Aus öffentlich einsehbaren Turnierberichten übernommen und gegen die offizielle Kartendatenbank, die Domain-Identität der Legende und die Bannliste vom 18.09.2026 geprüft. Listen nach dem Bann zählen doppelt. Teils unvollständig; Sideboards nicht enthalten.",
  "decks": [
   {
    "weight": 2,
@@ -203,6 +203,77 @@
     ],
     [
      "Zhonya's Hourglass",
+     2
+    ]
+   ]
+  },
+  {
+   "weight": 2,
+   "name": "Azir – Emperor of the Sands · Regional Qualifier Los Angeles (MICE Squirtle, 12-2-1) – nach dem Bann; En Garde/Sterak's Gage je Quelle 2–3 bzw. teils fehlend",
+   "legend": "Emperor of the Sands",
+   "event": "Regional Qualifier Los Angeles (MICE Squirtle, 12-2-1) – nach dem Bann; En Garde/Sterak's Gage je Quelle 2–3 bzw. teils fehlend",
+   "placement": "3.",
+   "date": "2026-09-27",
+   "source": "mobalytics.gg / riftwatch.gg",
+   "cards": [
+    [
+     "Azir, Sovereign",
+     1
+    ],
+    [
+     "Arise!",
+     3
+    ],
+    [
+     "B.F. Sword",
+     3
+    ],
+    [
+     "Back Off",
+     3
+    ],
+    [
+     "Brutalizer",
+     3
+    ],
+    [
+     "Defy",
+     3
+    ],
+    [
+     "Discipline",
+     3
+    ],
+    [
+     "Doran's Shield",
+     3
+    ],
+    [
+     "Eye of the Herald",
+     3
+    ],
+    [
+     "Guards!",
+     3
+    ],
+    [
+     "Hidden Blade",
+     3
+    ],
+    [
+     "Soul Sword",
+     3
+    ],
+    [
+     "Deathgrip",
+     2
+    ],
+    [
+     "En Garde",
+     2
+    ],
+    [
+     "Sterak's Gage",
      2
     ]
    ]
