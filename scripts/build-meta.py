@@ -104,15 +104,15 @@ for d in decks:
     report.append(f"{d['champion']:10} {len(cards):2} Karten ({sum(x[1] for x in cards):2} Ex.) | entfernt: {', '.join(dropped) or '-'}")
 print('\n'.join(report))
 TIERS = {
-  'Blade Dancer': 1, 'Wuju Bladesman, Starter': 1,
-  'Pridestalker': 2, 'Deceiver': 2, 'Emperor of the Sands': 2, 'Rogue Assassin': 2, 'Heart of the Tempest': 2,
+  'Blade Dancer': 1, 'Wuju Bladesman, Starter': 1, 'Pridestalker': 1, 'Heart of the Tempest': 1,
+  'Deceiver': 2, 'Emperor of the Sands': 2, 'Rogue Assassin': 2,
   'Gloomist': 3, 'Defender of Tomorrow': 3, 'Void Burrower': 3, 'Grand Duelist': 3, 'Daughter of the Void': 3,
   'Voidreaver': 3, 'Fire Below the Mountain': 3, 'Scorn of the Moon': 3, 'Purifier': 3, 'Prodigal Explorer': 3,
 }
 for k in TIERS: assert k.lower() in legends, k
 json.dump(dict(
-  updated='2026-10-12',
-  tiers=dict(source='riftbound.gg/tier-list', date='2026-10-03',
+  updated='2026-10-19',
+  tiers=dict(source='riftbound.gg (Heading to Radiance, Turniere 26.09.–08.10.)', date='2026-10-08',
              legends={legends[k.lower()]['fullName']: t for k, t in TIERS.items()}),
   note='Kernlisten aus Top-8- und Best-Of-Decks der Regional Qualifiers der Vendetta-Saison (Utrecht, Barcelona, Singapur, Sydney, Hartford, Vancouver, Atlanta, Los Angeles) und Turniere nach dem Bann vom 18.09. (RQ Los Angeles: Rengar, Irelia, Azir; Kennen: CCS Invitational Qualifier, Convergence #3). Aus öffentlich einsehbaren Turnierberichten übernommen und gegen die offizielle Kartendatenbank, die Domain-Identität der Legende und die Bannliste vom 18.09.2026 geprüft. Listen nach dem Bann zählen doppelt. Teils unvollständig; Sideboards nicht enthalten.',
   decks=out), open(os.path.join(ROOT, 'data/meta.json'),'w'), ensure_ascii=False, indent=1)
