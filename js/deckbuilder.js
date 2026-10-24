@@ -696,6 +696,72 @@ export function evaluateList(inventory, legend, list, allCards, community = null
   return deck;
 }
 
+/**
+ * Eine Liste (aus evaluateList) mit deiner Sammlung nachbauen: Was du hast,
+ * bleibt; jede fehlende Kopie wird durch einen Ersatzvorschlag ersetzt, solange
+ * du davon freie Kopien hast. Was dann noch fehlt, füllen Karten aus dem
+ * automatisch gebauten Deck derselben Legende (fallback) auf. Ergebnis hat
+ * Deck-Form (für Ansicht und Export) plus replaced/open/filled.
+ */
+export function substituteBuild(deck, inventory, fallback = null) {
+  const ownQty = c => inventory.owned.get(key(c))?.qty ?? 0;
+  const used = new Map(), out = new Map();
+  const free = c => Math.min(ownQty(c), maxCopies(c)) - (used.get(key(c)) ?? 0);
+  const add = (card, n, note) => {
+    const k = key(card);
+    const e = out.get(k) ?? { card, count: 0, notes: [] };
+    e.count += n;
+    if (note) e.notes.push(note);
+    out.set(k, e);
+    used.set(k, (used.get(k) ?? 0) + n);
+  };
+  for (const m of deck.main) if (m.have > 0) add(m.card, m.have);
+  const replaced = [], open = [];
+  for (const miss of deck.metaRef?.missing ?? []) {
+    let need = miss.missing;
+    for (const s of miss.suggest ?? []) {
+      const n = Math.min(need, free(s.card));
+      if (n <= 0) continue;
+      add(s.card, n, `${n}× statt ${miss.card.fullName ?? miss.card.name}`);
+      replaced.push({ from: miss.card, to: s.card, n });
+      need -= n;
+      if (!need) break;
+    }
+    if (need) open.push({ card: miss.card, n: need });
+  }
+  // Lücken (kein passender Ersatz) mit Karten aus deinem besten Deck dieser Legende füllen
+  let total = [...out.values()].reduce((s, e) => s + e.count, 0);
+  const filled = [];
+  if (fallback && total < RULES.MAIN) {
+    for (const m of fallback.main) {
+      if (total >= RULES.MAIN) break;
+      const n = Math.min(free(m.card), m.count, RULES.MAIN - total);
+      if (n <= 0) continue;
+      add(m.card, n, `${n}× Lückenfüller`);
+      filled.push({ card: m.card, n });
+      total += n;
+    }
+  }
+  const main = [...out.values()];
+  const ownedAll = list => list.every(x => (x.have ?? x.count) >= x.count);
+  const runes = deck.runes?.length && ownedAll(deck.runes) ? deck.runes : (fallback?.runes ?? deck.runes ?? []);
+  const bfOwned = (deck.battlefields ?? []).filter(b => (b.have ?? 1) >= 1);
+  const battlefields = [...bfOwned];
+  for (const b of fallback?.battlefields ?? []) {
+    if (battlefields.length >= RULES.BATTLEFIELDS) break;
+    if (!battlefields.some(x => key(x.card) === key(b.card))) battlefields.push(b);
+  }
+  const runeCount = runes.reduce((s, r) => s + r.count, 0);
+  const champion = deck.champion;
+  const hasChampion = !champion || main.some(m => m.card.type === 'unit' && m.card.name === champion && m.card.subtitle);
+  return {
+    ...deck, main, runes, battlefields, hasChampion,
+    counts: { main: total, runes: runeCount, battlefields: battlefields.length },
+    complete: total === RULES.MAIN && runeCount === RULES.RUNES && battlefields.length === RULES.BATTLEFIELDS && hasChampion,
+    replaced, open, filled, isBuild: true,
+  };
+}
+
 const metaIndexSize = m => (m.size ? [...m.values()][0].of : 0);
 
 /**

@@ -1,6 +1,6 @@
 import { parseCollection, parseDeckList, serializeCollection } from './parser.js';
 import { loadCards, buildInventory, resolve, key } from './db.js';
-import { suggestDecks, deckToText, deckToArena, deckTitle, checkDeck, championOf, groupByDomain, RULES, evaluateList } from './deckbuilder.js';
+import { suggestDecks, substituteBuild, deckToText, deckToArena, deckTitle, checkDeck, championOf, groupByDomain, RULES, evaluateList } from './deckbuilder.js';
 import { buildGuide } from './guide.js';
 import { isBanned, BANNED_AS_OF } from './banlist.js';
 import { SECTIONS, KEYWORDS, keywordsIn } from './rules.js';
@@ -48,7 +48,7 @@ function applyCollection(text, persist = true) {
   const { owned, unmatched } = buildInventory(state.db, entries);
   state.inv = { owned };
   state.unmatched = unmatched;
-  state.decks = state.imported = null;                       // wird beim Öffnen des Deck-Tabs berechnet
+  state.decks = state.imported = state.lists = null;                       // wird beim Öffnen des Deck-Tabs berechnet
   state.parseErrors = errors;
   if (persist) store(KEY.coll, text);
   renderHead();
@@ -85,8 +85,46 @@ function importedDecks() {
   return state.imported;
 }
 const importedById = id => importedDecks().find(d => d.imported.id === id);
+
+/**
+ * Mitgelieferte Turnier- und Community-Listen für eigene Legenden als Decks –
+ * unverändert, mit Bestand je Karte und Ersatzvorschlägen (wie hochgeladene).
+ */
+const listId = name => 'L' + [...name].reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) >>> 0, 7).toString(36);
+function listDecks() {
+  if (state.lists) return state.lists;
+  const comDate = state.community ? new Date(state.community.updated).toLocaleDateString('de-DE') : '';
+  const meta = metaDecks();
+  state.lists = builtinMeta().filter(m => state.inv.owned.has(m.legendKey)).map(m => {
+    const legend = state.db.byName.get(m.legendKey);
+    const main = [...m.cards].map(([k, count]) => ({ card: state.db.byName.get(k), count })).filter(x => x.card);
+    try {
+      const d = evaluateList(state.inv, legend, { name: m.name, main }, state.db.cards, state.community, meta);
+      d.listDeck = { id: listId(m.name), name: m.name, missing: d.imported.missing, kind: m.community ? 'Community-Liste' : 'Turnierliste',
+        info: m.community ? `Piltover Archive, Stand ${comDate}` : `${m.builtin?.placement ?? ''} · ${m.builtin?.date ?? ''} · ${m.builtin?.source ?? ''}` };
+      delete d.imported;
+      return d;
+    } catch (err) { console.warn('Liste nicht auswertbar:', m.name, err); return null; }
+  }).filter(Boolean);
+  return state.lists;
+}
+const listById = id => listDecks().find(d => d.listDeck.id === id);
+/** Nachbau einer Liste mit deiner Sammlung (bei automatisch gebauten Decks: das Deck selbst). */
+const buildCache = new WeakMap();
+function buildOf(d) {
+  if (!d.imported && !d.listDeck) return d;
+  if (!buildCache.has(d)) buildCache.set(d, substituteBuild(d, state.inv, decks().find(x => !x.imported && key(x.legend) === key(d.legend))));
+  return buildCache.get(d);
+}
+/** Das gerade offene Deck (Decks-Tab oder eine Liste aus dem Meta-Tab). */
+function detailDeck() {
+  if (state.view === 'meta' && state.openList) return listById(state.openList) ?? null;
+  if (state.view === 'decks' && state.deckIdx != null) return decks()[state.deckIdx] ?? null;
+  return null;
+}
+
 /** Eindeutige Kennung eines Decks: Legende, bei importierten Listen deren ID. */
-const deckId = d => (d.imported ? 'imp:' + d.imported.id : key(d.legend));
+const deckId = d => (d.imported ? 'imp:' + d.imported.id : d.listDeck ? 'list:' + d.listDeck.id : key(d.legend));
 
 /**
  * Gespeicherte Meta-Decklisten in eine Form bringen, die der Deckbau nutzen
@@ -450,28 +488,30 @@ function viewDeckDetail(d) {
   const curve = [1, 2, 3, 4, 5, 6].map(b =>
     `<div style="height:${(d.curve[b] ?? 0) / maxCurve * 100}%"><span>${d.curve[b] ?? 0}</span><i>${b === 6 ? '6+' : b}</i></div>`).join('');
 
+  const L = d.imported ?? d.listDeck;   // Deck aus einer Liste (hochgeladen oder Turnier/Community)
   return `
-    <div class="row" style="margin-bottom:14px"><button class="btn sm" id="backDecks">← Alle Decks</button></div>
-    <h2>${esc(d.imported ? d.imported.name : deckTitle(d))} <span class="badge ${d.complete ? 'ok' : 'warn'}">${d.complete ? 'komplett spielbar' : d.imported ? `dir fehlen ${d.imported.missing} Karten` : 'unvollständig'}</span></h2>
+    <div class="row" style="margin-bottom:14px">${d.listDeck ? '<button class="btn sm" id="backMeta">← Meta-Decks</button>'
+      : '<button class="btn sm" id="backDecks">← Alle Decks</button>'}</div>
+    <h2>${esc(L ? L.name : deckTitle(d))} <span class="badge ${d.complete ? 'ok' : 'warn'}">${d.complete ? 'komplett spielbar' : L ? `dir fehlen ${L.missing} Karten` : 'unvollständig'}</span></h2>
     ${d.imported ? `<div class="row" style="margin:-4px 0 10px;gap:8px"><span class="badge imp">importiert</span>
       <button class="btn sm" data-renmeta="${esc(d.imported.id)}">✏️ Namen ändern</button>
-      <span class="sub" style="margin:0">${esc(deckTitle(d))}</span></div>` : ''}
-    <p class="sub">${dots(d.identity)} ${d.identity.join(' + ')} · Bewertung ${(Math.round(d.rating * 10) / 10).toString().replace('.', ',')} (Stärke ${String(d.score).replace('.', ',')}) · Ø ${d.avgEnergy} Energie · ${d.imported ? 'deine hochgeladene Liste, unverändert' : 'nur Karten aus deinem Bestand'}
-      ${d.complete || d.imported ? '' : ` · es fehlen ${d.missingSlots.main} Hauptdeck-, ${d.missingSlots.runes} Runen- und ${d.missingSlots.battlefields} Schlachtfeldkarten`}
-      ${d.imported && d.counts.main !== 40 ? ` · <b>die Liste hat ${d.counts.main} statt 40 Hauptdeck-Karten</b>` : ''}
-      ${d.hasChampion ? '' : d.imported ? ` · <b>keine Champion-Einheit von ${esc(d.champion)} in der Liste</b> (Pflicht)` : ` · <b>keine Champion-Einheit von ${esc(d.champion)} im Bestand</b> (Pflicht)`}
-      ${d.metaRef ? (d.imported ? ` · du besitzt ${pct(d.metaRef.owned, 1)}% der Liste` : ` · setzt ${pct(d.metaRef.coverage, 1)}% der Turnierliste um`) : ''}
+      <span class="sub" style="margin:0">${esc(deckTitle(d))}</span></div>`
+      : d.listDeck ? `<div class="row" style="margin:-4px 0 10px;gap:8px"><span class="badge">${esc(d.listDeck.kind)}</span>
+      <span class="sub" style="margin:0">${esc(deckTitle(d))} · ${esc(d.listDeck.info)}</span></div>` : ''}
+    <p class="sub">${dots(d.identity)} ${d.identity.join(' + ')} · Bewertung ${(Math.round(d.rating * 10) / 10).toString().replace('.', ',')} (Stärke ${String(d.score).replace('.', ',')}) · Ø ${d.avgEnergy} Energie · ${d.imported ? 'deine hochgeladene Liste, unverändert' : d.listDeck ? 'die Liste, unverändert' : 'nur Karten aus deinem Bestand'}
+      ${d.complete || L ? '' : ` · es fehlen ${d.missingSlots.main} Hauptdeck-, ${d.missingSlots.runes} Runen- und ${d.missingSlots.battlefields} Schlachtfeldkarten`}
+      ${L && d.counts.main !== 40 ? ` · <b>die Liste hat ${d.counts.main} statt 40 Hauptdeck-Karten</b>` : ''}
+      ${d.hasChampion ? '' : L ? ` · <b>keine Champion-Einheit von ${esc(d.champion)} in der Liste</b> (Pflicht)` : ` · <b>keine Champion-Einheit von ${esc(d.champion)} im Bestand</b> (Pflicht)`}
+      ${d.metaRef ? (L ? ` · du besitzt ${pct(d.metaRef.owned, 1)}% der Liste` : ` · setzt ${pct(d.metaRef.coverage, 1)}% der Turnierliste um`) : ''}
       ${tierOf(d) ? ` · <b>Tier ${tierOf(d)}</b> laut ${esc(state.meta.tiers.source)} (Stand ${new Date(state.meta.tiers.date).toLocaleDateString('de-DE')})` : ''}</p>
 
     ${pinButtons(d)}
-    ${d.imported ? `<div class="notice" style="margin-bottom:16px"><b>Importierte Liste.</b> Unten steht die ganze Liste;
-      rot markiert sind Karten, die dir fehlen. Unter „Fehlende Karten“ findest du Ersatz aus deiner Sammlung, damit du das Deck
-      schon jetzt nachbauen kannst.</div>` : ''}
-    ${d.metaRef && !d.imported && d.metaRef.owned < 0.7 ? `<div class="notice" style="margin-bottom:16px"><b>Nur ${pct(d.metaRef.owned, 1)}% der
+    ${L ? buildBlock(d) : ''}
+    ${d.metaRef && !L && d.metaRef.owned < 0.7 ? `<div class="notice" style="margin-bottom:16px"><b>Nur ${pct(d.metaRef.owned, 1)}% der
       Turnierliste im Besitz.</b> Das Deck folgt der Liste, so weit deine Karten reichen, und ersetzt den Rest durch Karten mit
       ähnlicher Rolle. Gegen echte Turnierdecks fehlt ihm aber die Kernausstattung – wichtigste fehlende Karten:
       ${d.metaRef.missing.slice(0, 5).map(x => `${x.missing}× ${esc(cname(x.card))}`).join(', ')}. Vollständig unter „Weg zur Turnierliste".</div>` : ''}
-    ${d.metaRef || d.imported ? '' : `<div class="notice" style="margin-bottom:16px"><b>Ohne Turnierliste gebaut.</b> Für diese Legende liegt keine
+    ${d.metaRef || L ? '' : `<div class="notice" style="margin-bottom:16px"><b>Ohne Turnierliste gebaut.</b> Für diese Legende liegt keine
       Profi-Liste vor – das Deck folgt nur den Kartentexten (Regeln, Motor, Bedingungen). Spielbar, aber nicht turniererprobt.
       Mit einer eingefügten Turnierliste (Tab „Meta-Decks“) wählt die App aus deinen Karten gezielter aus.</div>`}
     ${difficultyBlock(d)}
@@ -480,7 +520,7 @@ function viewDeckDetail(d) {
 
     <div class="cols">
       <div>
-        <h3>Hauptdeck · ${d.counts.main}/40</h3>
+        <h3>${L ? 'Die Liste' : 'Hauptdeck'} · ${d.counts.main}/40</h3>
         ${groupByDomain(d).map(g => `<h4 class="domhead">${g.domains.map(x => `<span class="dom ${x}"></span>`).join('')} ${esc(g.label)} · ${g.count}</h4>
         <div class="lines">${g.cards.map(m => lineRow(m.count, m.card, null, (m.why ?? []).filter(w => w.ok === false).map(w => w.text), m.missing ?? 0)).join('')}</div>`).join('')}
         <h3>Energiekurve</h3>
@@ -565,6 +605,33 @@ function pathBlock(d) {
   </div>`;
 }
 
+/**
+ * Die Liste mit deiner Sammlung nachgebaut: fehlende Karten durch Ersatz aus
+ * deinem Bestand ersetzt, Lücken aus deinem besten Deck dieser Legende gefüllt.
+ * Kopierbar für TCG Arena oder als Text.
+ */
+function buildBlock(d) {
+  const b = buildOf(d);
+  const nRep = b.replaced.reduce((s, x) => s + x.n, 0), nFill = b.filled.reduce((s, x) => s + x.n, 0), nOpen = b.open.reduce((s, x) => s + x.n, 0);
+  const row = m => `<div class="line"${cv(m.card)}><span class="c">${m.count}×</span><span class="n">${esc(cname(m.card))}
+    ${m.notes.map(n => `<br><small class="suggest">↺ ${esc(n)}</small>`).join('')}</span><span class="e">${ident(m.card)}</span></div>`;
+  return `<details class="wishbox" style="margin-bottom:16px" open>
+    <summary style="cursor:pointer"><b>🔧 Mit deiner Sammlung nachbauen</b> · ${b.counts.main}/40${b.complete ? ' · komplett spielbar' : ''}</summary>
+    <p class="sub" style="margin:8px 0 10px">${nRep || nFill ? `${nRep} fehlende Karten durch passende aus deiner Sammlung ersetzt${nFill ? `, ${nFill} Lücken mit Karten aus deinem besten ${esc(d.champion ?? d.legend.name)}-Deck gefüllt` : ''}.`
+      : 'Du besitzt alle Karten – das ist die Liste, wie sie ist.'}
+      ${nOpen && b.counts.main < 40 ? ` Für ${nOpen} Karten gibt es keinen Ersatz in deiner Sammlung.` : ''}
+      Diese Fassung kannst du sofort bauen; mit „Baue ich“ wird genau sie gespeichert.</p>
+    ${groupByDomain(b).map(g => `<h4 class="domhead">${g.domains.map(x => `<span class="dom ${x}"></span>`).join('')} ${esc(g.label)} · ${g.count}</h4>
+      <div class="lines">${g.cards.map(row).join('')}</div>`).join('')}
+    <p class="sub" style="margin:8px 0 0">Runen: ${b.runes.map(r => `${r.count}× ${esc(r.card.name)}`).join(', ') || '–'} ·
+      Schlachtfelder: ${b.battlefields.map(x => esc(x.card.name)).join(', ') || '–'}</p>
+    <div class="row" style="margin-top:12px">
+      <button class="btn primary" data-copybuild="arena">Nachbau für TCG Arena kopieren</button>
+      <button class="btn" data-copybuild="text">Nachbau als Liste kopieren</button>
+    </div>
+  </details>`;
+}
+
 /* --- Meine Decks (angepinnt) --- */
 const PIN_LABEL = { spiele: 'Spiele ich', baue: 'Baue ich' };
 const pins = () => read(KEY.pins, []);
@@ -577,17 +644,20 @@ const pinCard = k => state.db.byName.get(k);
  * Meta-Update still anders aussehen. Neuere Versionen werden nur angezeigt.
  */
 function snapshot(d, status) {
+  // Listen werden als Nachbau mit deiner Sammlung gespeichert – das ist das Deck, das du wirklich baust.
+  const b = buildOf(d);
   return {
-    id: deckId(d), legendKey: key(d.legend), title: d.imported ? d.imported.name : deckTitle(d), status, savedAt: Date.now(),
+    id: deckId(d), legendKey: key(d.legend), title: (d.imported ?? d.listDeck)?.name ?? deckTitle(d), status, savedAt: Date.now(),
     identity: d.identity,
-    main: d.main.map(m => [key(m.card), m.count]),
-    runes: d.runes.map(r => [key(r.card), r.count]),
-    battlefields: d.battlefields.map(b => key(b.card)),
+    main: b.main.map(m => [key(m.card), m.count]),
+    runes: b.runes.map(r => [key(r.card), r.count]),
+    battlefields: b.battlefields.map(x => key(x.card)),
   };
 }
 const sig = list => list.map(([k, n]) => k + n).sort().join();
-const currentDeck = id => (id.startsWith('imp:') ? importedById(id.slice(4)) : decks().find(d => !d.imported && key(d.legend) === id));
-const isOutdated = p => { const d = currentDeck(p.id); return d && sig(p.main) !== sig(d.main.map(m => [key(m.card), m.count])); };
+const currentDeck = id => (id.startsWith('imp:') ? importedById(id.slice(4)) : id.startsWith('list:') ? listById(id.slice(5))
+  : decks().find(d => !d.imported && key(d.legend) === id));
+const isOutdated = p => { const d = currentDeck(p.id); return d && sig(p.main) !== sig(buildOf(d).main.map(m => [key(m.card), m.count])); };
 
 function pinButtons(d) {
   const p = pinOf(deckId(d));
@@ -751,8 +821,8 @@ function swapPlan(from, to, list) {
 /** Fehlt die angetippte Karte im gerade offenen Deck? Dann ihr Eintrag mit Ersatzvorschlägen. */
 function missingEntry(c, el) {
   const ctx = el.closest('[data-impctx]');
-  const d = ctx ? importedById(ctx.dataset.impctx)
-    : state.view === 'decks' && state.deckIdx != null ? decks()[state.deckIdx] : null;
+  const lc = el.closest('[data-listctx]');
+  const d = ctx ? importedById(ctx.dataset.impctx) : lc ? listById(lc.dataset.listctx) : detailDeck();
   return d?.metaRef?.missing.find(x => key(x.card) === key(c)) ?? null;
 }
 
@@ -860,6 +930,9 @@ function analyzeDeck(text) {
 }
 
 function viewMeta() {
+  // Geöffnete Turnier-/Community-Liste: wie ein Deck anzeigen, mit Nachbau aus deiner Sammlung
+  const open = state.openList && listById(state.openList);
+  if (open) return viewDeckDetail(open);
   const saved = read(KEY.meta, []);
   const analyses = saved.map(d => ({ ...d, a: analyzeDeck(d.text) })).sort((x, y) => y.a.pct - x.a.pct);
 
@@ -954,7 +1027,11 @@ function builtinBlock() {
     });
     const legendOwned = state.inv.owned.has(m.legendKey);
     const need = rows.reduce((s, r) => s + r.need, 0), have = rows.reduce((s, r) => s + r.have, 0);
-    return { m, rows, legendOwned, need, have, pct: pct(have, need) };
+    // Für eigene Legenden: als Deck ausgewertet, mit Ersatzvorschlägen je fehlender Karte
+    const deck = legendOwned ? listById(listId(m.name)) : null;
+    const sugg = new Map((deck?.metaRef.missing ?? []).map(x => [key(x.card), x]));
+    for (const r of rows) r.sugg = sugg.get(key(r.card));
+    return { m, rows, legendOwned, need, have, pct: pct(have, need), deck };
   }).sort((a, b) => b.legendOwned - a.legendOwned || b.pct - a.pct);
   if (!list.length) return '';
   return `<h3>Turnierlisten · Regional Qualifiers ${esc(state.meta.updated?.slice(0, 7) ?? '')}</h3>
@@ -962,15 +1039,22 @@ function builtinBlock() {
     ${list.map(x => {
       const b = x.m.builtin, cls = x.pct >= 95 ? 'ok' : x.pct >= 75 ? 'warn' : 'bad';
       const miss = x.rows.filter(r => r.missing > 0);
-      return `<details class="card" style="margin-bottom:10px">
+      const id = x.deck?.listDeck.id;
+      return `<details class="card" style="margin-bottom:10px"${id ? ` data-listctx="${esc(id)}"` : ''}>
         <summary class="row" style="justify-content:space-between;cursor:pointer">
           <div><b>${esc(b.name)}</b>
             <div class="m" style="font-size:12px;color:var(--dim)">${esc(b.placement)} · ${esc(b.date)} · ${esc(b.source)} ·
               ${x.have}/${x.need} Karten vorhanden${x.legendOwned ? '' : ' · <b>Legende fehlt dir</b>'}</div></div>
           <span class="badge ${cls}">${x.pct}%</span>
         </summary>
+        ${id ? `<div class="row" style="margin-top:10px;gap:6px">
+          <button class="btn sm primary" data-openlist="${esc(id)}">Öffnen &amp; mit deinen Karten nachbauen</button>
+          <button class="btn sm" data-pinlist="${esc(id)}" data-status="baue">🔧 Baue ich</button>
+          <button class="btn sm" data-pinlist="${esc(id)}" data-status="spiele">📌 Spiele ich</button>
+          ${pinOf('list:' + id) ? `<span class="badge ${pinOf('list:' + id).status === 'spiele' ? 'ok' : 'warn'}">${PIN_LABEL[pinOf('list:' + id).status]}</span>` : ''}
+        </div>` : ''}
         <div class="lines" style="margin-top:10px">${x.rows.map(r => `<div class="line ${r.missing ? 'missing' : ''}"${cv(r.card)}>
-          <span class="c">${r.need}×</span><span class="n">${esc(cname(r.card))}${r.missing ? ` <small class="warn">fehlt ${r.missing}×</small>` : ''}</span>
+          <span class="c">${r.need}×</span><span class="n">${esc(cname(r.card))}${r.missing ? ` <small class="warn">fehlt ${r.missing}×</small>` : ''}${r.sugg ? suggestLine(r.sugg) : ''}</span>
           <span class="e">${ident(r.card)}</span></div>`).join('')}</div>
         ${miss.length ? '' : '<div class="notice" style="margin-top:10px">Alle gelisteten Karten vorhanden.</div>'}
       </details>`;
@@ -1159,12 +1243,23 @@ document.addEventListener('click', async e => {
   const t = e.target.closest('button, [data-card]');
   if (!t) return;
 
-  if (t.dataset.view) { state.view = t.dataset.view; state.deckIdx = null; state.metaNotice = null; return render(); }
+  if (t.dataset.view) { state.view = t.dataset.view; state.deckIdx = null; state.openList = null; state.metaNotice = null; return render(); }
+  if (t.dataset.openlist) { state.view = 'meta'; state.openList = t.dataset.openlist; window.scrollTo(0, 0); return render(); }
+  if (t.id === 'backMeta') { state.openList = null; return render(); }
+  if (t.dataset.pinlist) {
+    const d = listById(t.dataset.pinlist);
+    if (d) store(KEY.pins, [...pins().filter(p => p.id !== deckId(d)), snapshot(d, t.dataset.status)]);
+    return render();
+  }
+  if (t.dataset.copybuild) {
+    const d = detailDeck();
+    if (d) return copy(t.dataset.copybuild === 'arena' ? deckToArena(buildOf(d)) : deckToText(buildOf(d)), t);
+  }
   if (t.dataset.deck) { state.deckIdx = +t.dataset.deck; return render(); }
   if (t.id === 'backDecks') { state.deckIdx = null; return render(); }
   if (t.dataset.pin) {
-    const d = decks()[state.deckIdx];
-    store(KEY.pins, [...pins().filter(p => p.id !== deckId(d)), snapshot(d, t.dataset.pin)]);
+    const d = detailDeck();
+    if (d) store(KEY.pins, [...pins().filter(p => p.id !== deckId(d)), snapshot(d, t.dataset.pin)]);
     return render();
   }
   if (t.dataset.unpin) { store(KEY.pins, pins().filter(p => p.id !== t.dataset.unpin)); return render(); }
@@ -1186,11 +1281,11 @@ document.addEventListener('click', async e => {
   }
   if (t.id === 'clearColl') {
     localStorage.removeItem(KEY.coll);
-    state.entries = []; state.inv = { owned: new Map() }; state.decks = state.imported = null; state.unmatched = [];
+    state.entries = []; state.inv = { owned: new Map() }; state.decks = state.imported = state.lists = null; state.unmatched = [];
     renderHead(); return render();
   }
-  if (t.id === 'copyDeck') return copy(deckToText(decks()[state.deckIdx]), t);
-  if (t.id === 'copyArena') return copy(deckToArena(decks()[state.deckIdx]), t);
+  if (t.id === 'copyDeck') return copy(deckToText(detailDeck()), t);
+  if (t.id === 'copyArena') return copy(deckToArena(detailDeck()), t);
   if (t.dataset.pinarena) {
     const p = pinOf(t.dataset.pinarena);
     if (p) return copy(deckToArena(pinAsDeck(p)), t);
@@ -1213,7 +1308,7 @@ document.addEventListener('click', async e => {
       ${cnt} Hauptdeck-Karten${parsed.unknown.length ? `, <b>${parsed.unknown.length} Zeile(n) nicht erkannt:</b> ${parsed.unknown.slice(0, 5).map(esc).join(' · ')}` : ''}.`;
     const own = $('#metaOwn').checked;
     store(KEY.meta, [...read(KEY.meta, []), { id: String(Date.now()), name, text, own }]);
-    state.decks = state.imported = null;
+    state.decks = state.imported = state.lists = null;
     return render();
   }
   if (t.dataset.renmeta) {
@@ -1222,7 +1317,7 @@ document.addEventListener('click', async e => {
     if (!name) return;
     store(KEY.meta, saved.map(x => (x.id === id ? { ...x, name } : x)));
     store(KEY.pins, pins().map(p => (p.id === 'imp:' + id ? { ...p, title: name } : p)));
-    state.decks = state.imported = null;
+    state.decks = state.imported = state.lists = null;
     return render();
   }
   if (t.dataset.pinimp) {
@@ -1240,7 +1335,7 @@ document.addEventListener('click', async e => {
     if (!m || !confirm(`„${m.name}“ löschen? Du kannst sie danach unter „Zuletzt gelöscht“ wiederherstellen.`)) return;
     store(KEY.trash, [{ ...m, deletedAt: Date.now() }, ...read(KEY.trash, [])].slice(0, 30));
     store(KEY.meta, saved.filter(d => d.id !== m.id));
-    state.decks = state.imported = null; return render();
+    state.decks = state.imported = state.lists = null; return render();
   }
   if (t.dataset.restoremeta) {
     const trash = read(KEY.trash, []), m = trash.find(d => d.id === t.dataset.restoremeta);
@@ -1249,7 +1344,7 @@ document.addEventListener('click', async e => {
       store(KEY.meta, [...read(KEY.meta, []).filter(d => d.id !== list.id), list]);
       store(KEY.trash, trash.filter(d => d.id !== list.id));
     }
-    state.decks = state.imported = null; return render();
+    state.decks = state.imported = state.lists = null; return render();
   }
   if (t.dataset.restorepin) {
     const p = pinOf(t.dataset.restorepin), id = p?.id.slice(4);
@@ -1257,7 +1352,7 @@ document.addEventListener('click', async e => {
     const trash = read(KEY.trash, []), orig = trash.find(d => d.id === id);
     if (orig) { const { deletedAt, ...list } = orig; store(KEY.meta, [...read(KEY.meta, []), list]); store(KEY.trash, trash.filter(d => d.id !== id)); }
     else if (p) store(KEY.meta, [...read(KEY.meta, []), { id, name: p.title, text: pinToText(p), own: false, legend: p.legendKey }]);
-    state.decks = state.imported = null; return render();
+    state.decks = state.imported = state.lists = null; return render();
   }
   if (t.id === 'dlBackup') {
     const data = { app: 'riftbound-collection', version: 1, savedAt: new Date().toISOString(),
@@ -1309,7 +1404,7 @@ document.addEventListener('change', e => {
   if (e.target.dataset?.legendfor) {
     const id = e.target.dataset.legendfor, legend = e.target.value || null;
     store(KEY.meta, read(KEY.meta, []).map(x => (x.id === id ? { ...x, legend } : x)));
-    state.decks = state.imported = null;
+    state.decks = state.imported = state.lists = null;
     // Angepinnte Fassung auf die neue Legende umstellen
     const old = pinOf('imp:' + id), d = importedById(id);
     if (old && d) store(KEY.pins, pins().map(p => (p.id === old.id ? snapshot(d, old.status) : p)));
@@ -1330,7 +1425,7 @@ document.addEventListener('change', e => {
         store(KEY.pins, [...pins(), ...addPins]);
         state.backupNotice = `Sicherung geladen: ${addLists.length} Liste(n) und ${addPins.length} angepinnte(s) Deck(s) hinzugefügt.`;
       } catch (err) { state.backupNotice = `Datei nicht lesbar: ${esc(err.message)}`; }
-      state.decks = state.imported = null; render();
+      state.decks = state.imported = state.lists = null; render();
     });
     return;
   }
