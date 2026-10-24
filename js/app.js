@@ -527,7 +527,7 @@ function viewDeckDetail(d) {
         <div class="curve">${curve}</div>
       </div>
       <div>
-        <h3>Legende</h3><div class="lines">${lineRow(1, d.legend, deckTitle(d))}</div>
+        ${legendChampion(d.legend, d.main)}
         <h3>Runen · ${d.counts.runes}/12</h3>
         ${d.runes[0]?.auto ? '<p class="sub" style="margin:0 0 6px">Nicht in der Liste – aus deinem Bestand ergänzt.</p>' : ''}
         <div class="lines">${d.runes.map(m => lineRow(m.count, m.card, null, [], m.count - (m.have ?? m.count))).join('')}</div>
@@ -621,6 +621,7 @@ function buildBlock(d) {
       : 'Du besitzt alle Karten – das ist die Liste, wie sie ist.'}
       ${nOpen && b.counts.main < 40 ? ` Für ${nOpen} Karten gibt es keinen Ersatz in deiner Sammlung.` : ''}
       Diese Fassung kannst du sofort bauen; mit „Baue ich“ wird genau sie gespeichert.</p>
+    ${legendChampion(d.legend, b.main)}
     ${groupByDomain(b).map(g => `<h4 class="domhead">${g.domains.map(x => `<span class="dom ${x}"></span>`).join('')} ${esc(g.label)} · ${g.count}</h4>
       <div class="lines">${g.cards.map(row).join('')}</div>`).join('')}
     <p class="sub" style="margin:8px 0 0">Runen: ${b.runes.map(r => `${r.count}× ${esc(r.card.name)}`).join(', ') || '–'} ·
@@ -774,12 +775,27 @@ function pinAsDeck(p) {
   };
 }
 
+/**
+ * Legende und gewählter Champion (Chosen Champion) eines Decks: die
+ * Champion-Einheit mit den meisten Kopien – wie beim TCG-Arena-Export.
+ */
+function legendChampion(legend, main) {
+  const champ = championOf(legend, state.db.cards);
+  const unit = main.filter(m => m.card.type === 'unit' && m.card.name === champ && m.card.subtitle).sort((a, b) => b.count - a.count)[0];
+  return `<h4 class="domhead">Legende &amp; Champion</h4><div class="lines">
+    ${lineRow(1, legend, `${champ ? champ + ' – ' : ''}${legend.name} (Legende)`)}
+    ${unit ? lineRow(1, unit.card, `${cname(unit.card)} (gewählter Champion)`)
+      : `<div class="line missing"><span class="n">Keine Champion-Einheit von ${esc(champ ?? '?')} im Deck – Pflicht</span></div>`}</div>`;
+}
+
 /** Gespeicherte Liste eines angepinnten Decks, nach Farbe gruppiert. */
 function pinList(p) {
   const main = p.main.map(([k, count]) => ({ card: pinCard(k), count })).filter(m => m.card);
   const groups = groupByDomain({ main, identity: p.identity });
   const rows = (arr) => arr.map(m => lineRow(m.count, m.card)).join('');
+  const legend = pinCard(p.legendKey);
   return `<div style="margin-top:12px">
+    ${legend ? legendChampion(legend, main) : ''}
     ${groups.map(g => `<h4 class="domhead">${g.domains.map(x => `<span class="dom ${x}"></span>`).join('')} ${esc(g.label)} · ${g.count}</h4>
       <div class="lines">${rows(g.cards)}</div>`).join('')}
     <h4 class="domhead">Runen</h4><div class="lines">${rows(p.runes.map(([k, count]) => ({ card: pinCard(k), count })).filter(m => m.card))}</div>
