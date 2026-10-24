@@ -59,8 +59,6 @@ decks = [
    cards="1 Lucian, Merciless; 3 Gem Jammer; 3 Irresistible Faefolk; 1 Legion Rearguard; 2 First Mate; 2 Kinkou Initiate; 3 Kai'Sa, Survivor; 2 Noxus Hopeful; 1 Poppy, Paragon; 2 Ruin Runner; 3 Doran's Blade; 3 Long Sword; 3 Blighted Battleaxe; 1 Trinity Force; 3 Punch First; 2 Sabotage; 2 Challenge; 3 Relentless Pursuit"),
  dict(legend='Purifier', champion='Lucian', event='Regional Qualifier Sydney (LockOn)', placement='Best-Of', date='2026', source=MOBA,
    cards="1 Lucian, Merciless; 2 Gem Jammer; 3 Irresistible Faefolk; 3 First Mate; 3 Kinkou Initiate; 3 Kai'Sa, Survivor; 3 Ruin Runner; 3 Doran's Blade; 3 Skyfall of Areion; 2 Blighted Battleaxe; 3 Trinity Force; 2 Punch First; 2 Sabotage; 2 Challenge; 2 Confront; 3 Relentless Pursuit"),
- dict(legend='Heart of the Tempest', champion='Kennen', event='CCS $25.000 Showdown Invitational Qualifier (Koko Lopez) – nach dem Bann', placement='7.', date='2026-10', source='tcgplayer.com', weight=2,
-   cards='1 Kennen, Storm of Shuriken; 1 Baron Nashor; 2 Ezreal, Prodigy; 2 Fizz, Trickster; 1 Flash; 1 Gust; 2 Last Rites; 3 Lightning Rush; 3 Rhasa the Sunderer; 1 Ride the Wind; 1 Salvage; 3 Seal of Discord; 3 Shadow Order Disciple; 1 Shadows of the Past; 2 Star-Crossed; 2 Switcheroo; 3 Tail-Cloaked Matriarch; 1 The Harrowing; 1 Tideturner; 2 Tornado Warrior; 3 Traveling Merchant; 1 Treasure Hunter'),
  dict(legend='Heart of the Tempest', champion='Kennen', event='Convergence #3 (Subops Gastaidon) – nach dem Bann', placement='5.', date='2026-10', source='tcgplayer.com', weight=2,
    cards='3 Seal of Discord; 1 Sivir, Mercenary; 2 Star-Crossed; 1 Switcheroo; 1 Tactical Retreat; 2 Tail-Cloaked Matriarch; 1 Tideturner; 3 Tornado Warrior; 3 Traveling Merchant; 3 Trifarian Gloryseeker; 1 Unsung Hero; 2 Fizz, Trickster; 1 Cemetery Attendant; 1 Edge of Night; 1 Existential Dread; 3 Call to Glory'),
  dict(legend='Bounty Hunter', champion='Miss Fortune', event='Regional Qualifier Utrecht (Vendilion)', placement='Best-Of', date='2026', source=MOBA,
@@ -100,19 +98,26 @@ for d in decks:
         if any(x!='colorless' and x not in ident for x in c['domains']): dropped.append(f'{name} (Domain {c["domains"]})'); continue
         if name.lower() in BANNED: dropped.append(f'{name} (gebannt)'); continue
         cards.append([c['fullName'], min(n,3)])
-    out.append(dict(weight=d.get('weight', 1), name=f"{d['champion']} – {L['name']} · {d['event']}", legend=L['fullName'], event=d['event'], placement=d['placement'], date=d['date'], source=d['source'], cards=cards))
+    # Vendetta-Listen (vor Radiance) zählen nur ein Viertel: Wo es schon genug
+    # Radiance-Community-Decks gibt, sind die das Vorbild (Gewicht 0,6).
+    era = d.get('era', 'Vendetta')
+    w = d.get('weight', 1) * (0.25 if era == 'Vendetta' else 1)
+    out.append(dict(weight=w, era=era, name=f"{d['champion']} – {L['name']} · {d['event']}", legend=L['fullName'], event=d['event'], placement=d['placement'], date=d['date'], source=d['source'], cards=cards))
     report.append(f"{d['champion']:10} {len(cards):2} Karten ({sum(x[1] for x in cards):2} Ex.) | entfernt: {', '.join(dropped) or '-'}")
 print('\n'.join(report))
+# Vorläufig für Radiance (Set seit 23.10.): Tier 1 = die Legenden mit den besten
+# Ergebnissen im Radiance-Day-1-Bericht; die Vendetta-Tier-1 ohne Radiance-Belege
+# stehen in Tier 2, bis neue Ergebnisse vorliegen.
 TIERS = {
-  'Blade Dancer': 1, 'Wuju Bladesman, Starter': 1, 'Pridestalker': 1, 'Heart of the Tempest': 1,
-  'Deceiver': 2, 'Emperor of the Sands': 2, 'Rogue Assassin': 2,
-  'Gloomist': 3, 'Defender of Tomorrow': 3, 'Void Burrower': 3, 'Grand Duelist': 3, 'Daughter of the Void': 3,
+  'The Exile': 1, 'Heart of the Tempest': 1, 'Daughter of the Void': 1,
+  'Rogue Assassin': 2, 'Blade Dancer': 2, 'Wuju Bladesman, Starter': 2, 'Pridestalker': 2, 'Deceiver': 2, 'Emperor of the Sands': 2,
+  'Gloomist': 3, 'Defender of Tomorrow': 3, 'Void Burrower': 3, 'Grand Duelist': 3,
   'Voidreaver': 3, 'Fire Below the Mountain': 3, 'Scorn of the Moon': 3, 'Purifier': 3, 'Prodigal Explorer': 3,
 }
 for k in TIERS: assert k.lower() in legends, k
 json.dump(dict(
-  updated='2026-10-19',
-  tiers=dict(source='riftbound.gg (Heading to Radiance, Turniere 26.09.–08.10.)', date='2026-10-08',
+  updated='2026-10-24',
+  tiers=dict(source='vorläufig: riftbound.gg Radiance-Day-1-Bericht (22.10.) + Vendetta-Tierliste (09.10.)', date='2026-10-22',
              legends={legends[k.lower()]['fullName']: t for k, t in TIERS.items()}),
-  note='Kernlisten aus Top-8- und Best-Of-Decks der Regional Qualifiers der Vendetta-Saison (Utrecht, Barcelona, Singapur, Sydney, Hartford, Vancouver, Atlanta, Los Angeles) und Turniere nach dem Bann vom 18.09. (RQ Los Angeles: Rengar, Irelia, Azir; Kennen: CCS Invitational Qualifier, Convergence #3). Aus öffentlich einsehbaren Turnierberichten übernommen und gegen die offizielle Kartendatenbank, die Domain-Identität der Legende und die Bannliste vom 18.09.2026 geprüft. Listen nach dem Bann zählen doppelt. Teils unvollständig; Sideboards nicht enthalten.',
+  note='Kernlisten aus Top-8- und Best-Of-Decks der Regional Qualifiers der Vendetta-Saison (Utrecht, Barcelona, Singapur, Sydney, Hartford, Vancouver, Atlanta, Los Angeles) und Turniere nach dem Bann vom 18.09. (RQ Los Angeles: Rengar, Irelia, Azir; Kennen: Convergence #3). Aus öffentlich einsehbaren Turnierberichten übernommen und gegen die offizielle Kartendatenbank, die Domain-Identität der Legende und die Bannliste vom 18.09.2026 geprüft. Listen nach dem Bann zählen doppelt. Teils unvollständig; Sideboards nicht enthalten. Seit Radiance (23.10.) zählen diese Vendetta-Listen nur noch ein Viertel – wo es genug Radiance-Decks gibt, ist die Community-Kernliste das Vorbild.',
   decks=out), open(os.path.join(ROOT, 'data/meta.json'),'w'), ensure_ascii=False, indent=1)

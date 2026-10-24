@@ -1,21 +1,22 @@
 {
- "updated": "2026-10-19",
+ "updated": "2026-10-24",
  "tiers": {
-  "source": "riftbound.gg (Heading to Radiance, Turniere 26.09.–08.10.)",
-  "date": "2026-10-08",
+  "source": "vorläufig: riftbound.gg Radiance-Day-1-Bericht (22.10.) + Vendetta-Tierliste (09.10.)",
+  "date": "2026-10-22",
   "legends": {
-   "Blade Dancer": 1,
-   "Wuju Bladesman, Starter": 1,
-   "Pridestalker": 1,
+   "The Exile": 1,
    "Heart of the Tempest": 1,
+   "Daughter of the Void": 1,
+   "Rogue Assassin": 2,
+   "Blade Dancer": 2,
+   "Wuju Bladesman, Starter": 2,
+   "Pridestalker": 2,
    "Deceiver": 2,
    "Emperor of the Sands": 2,
-   "Rogue Assassin": 2,
    "Gloomist": 3,
    "Defender of Tomorrow": 3,
    "Void Burrower": 3,
    "Grand Duelist": 3,
-   "Daughter of the Void": 3,
    "Voidreaver": 3,
    "Fire Below the Mountain": 3,
    "Scorn of the Moon": 3,
@@ -23,10 +24,11 @@
    "Prodigal Explorer": 3
   }
  },
- "note": "Kernlisten aus Top-8- und Best-Of-Decks der Regional Qualifiers der Vendetta-Saison (Utrecht, Barcelona, Singapur, Sydney, Hartford, Vancouver, Atlanta, Los Angeles) und Turniere nach dem Bann vom 18.09. (RQ Los Angeles: Rengar, Irelia, Azir; Kennen: CCS Invitational Qualifier, Convergence #3). Aus öffentlich einsehbaren Turnierberichten übernommen und gegen die offizielle Kartendatenbank, die Domain-Identität der Legende und die Bannliste vom 18.09.2026 geprüft. Listen nach dem Bann zählen doppelt. Teils unvollständig; Sideboards nicht enthalten.",
+ "note": "Kernlisten aus Top-8- und Best-Of-Decks der Regional Qualifiers der Vendetta-Saison (Utrecht, Barcelona, Singapur, Sydney, Hartford, Vancouver, Atlanta, Los Angeles) und Turniere nach dem Bann vom 18.09. (RQ Los Angeles: Rengar, Irelia, Azir; Kennen: Convergence #3). Aus öffentlich einsehbaren Turnierberichten übernommen und gegen die offizielle Kartendatenbank, die Domain-Identität der Legende und die Bannliste vom 18.09.2026 geprüft. Listen nach dem Bann zählen doppelt. Teils unvollständig; Sideboards nicht enthalten. Seit Radiance (23.10.) zählen diese Vendetta-Listen nur noch ein Viertel – wo es genug Radiance-Decks gibt, ist die Community-Kernliste das Vorbild.",
  "decks": [
   {
-   "weight": 2,
+   "weight": 0.5,
+   "era": "Vendetta",
    "name": "Rengar – Pridestalker · Regional Qualifier Los Angeles (DSG Prismaticism, 14-0-2) – nach dem Bann",
    "legend": "Pridestalker",
    "event": "Regional Qualifier Los Angeles (DSG Prismaticism, 14-0-2) – nach dem Bann",
@@ -109,7 +111,8 @@
    ]
   },
   {
-   "weight": 2,
+   "weight": 0.5,
+   "era": "Vendetta",
    "name": "Irelia – Blade Dancer · Regional Qualifier Los Angeles (Xeno) – nach dem Bann",
    "legend": "Blade Dancer",
    "event": "Regional Qualifier Los Angeles (Xeno) – nach dem Bann",
@@ -208,7 +211,8 @@
    ]
   },
   {
-   "weight": 2,
+   "weight": 0.5,
+   "era": "Vendetta",
    "name": "Azir – Emperor of the Sands · Regional Qualifier Los Angeles (MICE Squirtle, 12-2-1) – nach dem Bann; En Garde/Sterak's Gage je Quelle 2–3 bzw. teils fehlend",
    "legend": "Emperor of the Sands",
    "event": "Regional Qualifier Los Angeles (MICE Squirtle, 12-2-1) – nach dem Bann; En Garde/Sterak's Gage je Quelle 2–3 bzw. teils fehlend",
@@ -279,7 +283,8 @@
    ]
   },
   {
-   "weight": 1,
+   "weight": 0.25,
+   "era": "Vendetta",
    "name": "Master Yi – Wuju Bladesman · Regional Qualifier Utrecht (Bakura)",
    "legend": "Wuju Bladesman, Starter",
    "event": "Regional Qualifier Utrecht (Bakura)",
@@ -342,7 +347,8 @@
    ]
   },
   {
-   "weight": 1,
+   "weight": 0.25,
+   "era": "Vendetta",
    "name": "Irelia – Blade Dancer · Regional Qualifier Singapur (Big Willy Dfoe)",
    "legend": "Blade Dancer",
    "event": "Regional Qualifier Singapur (Big Willy Dfoe)",
@@ -425,7 +431,8 @@
    ]
   },
   {
-   "weight": 1,
+   "weight": 0.25,
+   "era": "Vendetta",
    "name": "Akali – Rogue Assassin · Regional Qualifier Barcelona (ASC HaruKaze)",
    "legend": "Rogue Assassin",
    "event": "Regional Qualifier Barcelona (ASC HaruKaze)",
@@ -488,7 +495,8 @@
    ]
   },
   {
-   "weight": 1,
+   "weight": 0.25,
+   "era": "Vendetta",
    "name": "Kennen – Heart of the Tempest · Regional Qualifier Barcelona (ECL Mosik) – vor dem Bann",
    "legend": "Heart of the Tempest",
    "event": "Regional Qualifier Barcelona (ECL Mosik) – vor dem Bann",
@@ -579,7 +587,8 @@
    ]
   },
   {
-   "weight": 1,
+   "weight": 0.25,
+   "era": "Vendetta",
    "name": "Jayce – Defender of Tomorrow · Regional Qualifier Singapur (justmilkey)",
    "legend": "Defender of Tomorrow",
    "event": "Regional Qualifier Singapur (justmilkey)",
@@ -662,7 +671,8 @@
    ]
   },
   {
-   "weight": 1,
+   "weight": 0.25,
+   "era": "Vendetta",
    "name": "Rek'Sai – Void Burrower · Regional Qualifier Barcelona (Kevplayer)",
    "legend": "Void Burrower",
    "event": "Regional Qualifier Barcelona (Kevplayer)",
@@ -741,7 +751,8 @@
    ]
   },
   {
-   "weight": 1,
+   "weight": 0.25,
+   "era": "Vendetta",
    "name": "Ezreal – Prodigal Explorer · Regional Qualifier Barcelona (PoW SpaghetiCode)",
    "legend": "Prodigal Explorer",
    "event": "Regional Qualifier Barcelona (PoW SpaghetiCode)",
@@ -788,7 +799,8 @@
    ]
   },
   {
-   "weight": 1,
+   "weight": 0.25,
+   "era": "Vendetta",
    "name": "Azir – Emperor of the Sands · Regional Qualifier Utrecht (Squirtle)",
    "legend": "Emperor of the Sands",
    "event": "Regional Qualifier Utrecht (Squirtle)",
@@ -863,7 +875,8 @@
    ]
   },
   {
-   "weight": 1,
+   "weight": 0.25,
+   "era": "Vendetta",
    "name": "Annie – Dark Child · Regional Qualifier Hartford (Prismaticism)",
    "legend": "Dark Child, Starter",
    "event": "Regional Qualifier Hartford (Prismaticism)",
@@ -938,7 +951,8 @@
    ]
   },
   {
-   "weight": 1,
+   "weight": 0.25,
+   "era": "Vendetta",
    "name": "Diana – Scorn of the Moon · Regional Qualifier Sydney (CTG Alanzq)",
    "legend": "Scorn of the Moon",
    "event": "Regional Qualifier Sydney (CTG Alanzq)",
@@ -1017,7 +1031,8 @@
    ]
   },
   {
-   "weight": 1,
+   "weight": 0.25,
+   "era": "Vendetta",
    "name": "Diana – Scorn of the Moon · Regional Qualifier Hartford (ASC Evansrhim)",
    "legend": "Scorn of the Moon",
    "event": "Regional Qualifier Hartford (ASC Evansrhim)",
@@ -1100,7 +1115,8 @@
    ]
   },
   {
-   "weight": 1,
+   "weight": 0.25,
+   "era": "Vendetta",
    "name": "Sett – The Boss · Regional Qualifier Utrecht (CTCG Collin K)",
    "legend": "The Boss",
    "event": "Regional Qualifier Utrecht (CTCG Collin K)",
@@ -1175,7 +1191,8 @@
    ]
   },
   {
-   "weight": 1,
+   "weight": 0.25,
+   "era": "Vendetta",
    "name": "Viktor – Herald of the Arcane · Regional Qualifier Utrecht (Rednaxell)",
    "legend": "Herald of the Arcane",
    "event": "Regional Qualifier Utrecht (Rednaxell)",
@@ -1258,7 +1275,8 @@
    ]
   },
   {
-   "weight": 1,
+   "weight": 0.25,
+   "era": "Vendetta",
    "name": "Darius – Hand of Noxus · Regional Qualifier Utrecht (MICE DiamondHat)",
    "legend": "Hand of Noxus",
    "event": "Regional Qualifier Utrecht (MICE DiamondHat)",
@@ -1333,7 +1351,8 @@
    ]
   },
   {
-   "weight": 1,
+   "weight": 0.25,
+   "era": "Vendetta",
    "name": "Ornn – Fire Below the Mountain · Regional Qualifier Barcelona (MICE TheManland)",
    "legend": "Fire Below the Mountain",
    "event": "Regional Qualifier Barcelona (MICE TheManland)",
@@ -1416,7 +1435,8 @@
    ]
   },
   {
-   "weight": 1,
+   "weight": 0.25,
+   "era": "Vendetta",
    "name": "Lucian – Purifier · Regional Qualifier Hartford (Kaillou)",
    "legend": "Purifier",
    "event": "Regional Qualifier Hartford (Kaillou)",
@@ -1499,7 +1519,8 @@
    ]
   },
   {
-   "weight": 1,
+   "weight": 0.25,
+   "era": "Vendetta",
    "name": "Lucian – Purifier · Regional Qualifier Sydney (LockOn)",
    "legend": "Purifier",
    "event": "Regional Qualifier Sydney (LockOn)",
@@ -1574,106 +1595,8 @@
    ]
   },
   {
-   "weight": 2,
-   "name": "Kennen – Heart of the Tempest · CCS $25.000 Showdown Invitational Qualifier (Koko Lopez) – nach dem Bann",
-   "legend": "Heart of the Tempest",
-   "event": "CCS $25.000 Showdown Invitational Qualifier (Koko Lopez) – nach dem Bann",
-   "placement": "7.",
-   "date": "2026-10",
-   "source": "tcgplayer.com",
-   "cards": [
-    [
-     "Kennen, Storm of Shuriken",
-     1
-    ],
-    [
-     "Baron Nashor",
-     1
-    ],
-    [
-     "Ezreal, Prodigy",
-     2
-    ],
-    [
-     "Fizz, Trickster",
-     2
-    ],
-    [
-     "Flash",
-     1
-    ],
-    [
-     "Gust",
-     1
-    ],
-    [
-     "Last Rites",
-     2
-    ],
-    [
-     "Lightning Rush",
-     3
-    ],
-    [
-     "Rhasa the Sunderer",
-     3
-    ],
-    [
-     "Ride the Wind",
-     1
-    ],
-    [
-     "Salvage",
-     1
-    ],
-    [
-     "Seal of Discord",
-     3
-    ],
-    [
-     "Shadow Order Disciple",
-     3
-    ],
-    [
-     "Shadows of the Past",
-     1
-    ],
-    [
-     "Star-Crossed",
-     2
-    ],
-    [
-     "Switcheroo",
-     2
-    ],
-    [
-     "Tail-Cloaked Matriarch",
-     3
-    ],
-    [
-     "The Harrowing",
-     1
-    ],
-    [
-     "Tideturner",
-     1
-    ],
-    [
-     "Tornado Warrior",
-     2
-    ],
-    [
-     "Traveling Merchant",
-     3
-    ],
-    [
-     "Treasure Hunter",
-     1
-    ]
-   ]
-  },
-  {
-   "weight": 2,
+   "weight": 0.5,
+   "era": "Vendetta",
    "name": "Kennen – Heart of the Tempest · Convergence #3 (Subops Gastaidon) – nach dem Bann",
    "legend": "Heart of the Tempest",
    "event": "Convergence #3 (Subops Gastaidon) – nach dem Bann",
@@ -1748,7 +1671,8 @@
    ]
   },
   {
-   "weight": 1,
+   "weight": 0.25,
+   "era": "Vendetta",
    "name": "Miss Fortune – Bounty Hunter · Regional Qualifier Utrecht (Vendilion)",
    "legend": "Bounty Hunter",
    "event": "Regional Qualifier Utrecht (Vendilion)",
@@ -1815,7 +1739,8 @@
    ]
   },
   {
-   "weight": 1,
+   "weight": 0.25,
+   "era": "Vendetta",
    "name": "Renata Glasc – Chem-Baroness · Regional Qualifier Singapur (Purp)",
    "legend": "Chem-Baroness",
    "event": "Regional Qualifier Singapur (Purp)",
@@ -1882,7 +1807,8 @@
    ]
   },
   {
-   "weight": 1,
+   "weight": 0.25,
+   "era": "Vendetta",
    "name": "LeBlanc – Deceiver · Kernkarten aus Top-Listen (Xi'an Top 8, Sydney 7., RQ Los Angeles 12.)",
    "legend": "Deceiver",
    "event": "Kernkarten aus Top-Listen (Xi'an Top 8, Sydney 7., RQ Los Angeles 12.)",
@@ -1953,7 +1879,8 @@
    ]
   },
   {
-   "weight": 1,
+   "weight": 0.25,
+   "era": "Vendetta",
    "name": "Jinx – Loose Cannon · Regional Qualifier Vancouver (Spiritless)",
    "legend": "Loose Cannon",
    "event": "Regional Qualifier Vancouver (Spiritless)",
@@ -2044,7 +1971,8 @@
    ]
   },
   {
-   "weight": 1,
+   "weight": 0.25,
+   "era": "Vendetta",
    "name": "Vex – Gloomist · Regional Qualifier Sydney (EEP Bonk Repeat)",
    "legend": "Gloomist",
    "event": "Regional Qualifier Sydney (EEP Bonk Repeat)",
@@ -2131,7 +2059,8 @@
    ]
   },
   {
-   "weight": 1,
+   "weight": 0.25,
+   "era": "Vendetta",
    "name": "Fiora – Grand Duelist · Regional Qualifier Singapur (Fr0zen)",
    "legend": "Grand Duelist",
    "event": "Regional Qualifier Singapur (Fr0zen)",
@@ -2210,7 +2139,8 @@
    ]
   },
   {
-   "weight": 1,
+   "weight": 0.25,
+   "era": "Vendetta",
    "name": "Fiora – Grand Duelist · Regional Qualifier Atlanta (VVES) – Quelle nennt 41 Karten, 1× Call to Glory gestrichen",
    "legend": "Grand Duelist",
    "event": "Regional Qualifier Atlanta (VVES) – Quelle nennt 41 Karten, 1× Call to Glory gestrichen",
@@ -2285,7 +2215,8 @@
    ]
   },
   {
-   "weight": 1,
+   "weight": 0.25,
+   "era": "Vendetta",
    "name": "Fiora – Grand Duelist · Regional Qualifier Vancouver (Ricemaster)",
    "legend": "Grand Duelist",
    "event": "Regional Qualifier Vancouver (Ricemaster)",
@@ -2360,7 +2291,8 @@
    ]
   },
   {
-   "weight": 1,
+   "weight": 0.25,
+   "era": "Vendetta",
    "name": "Kha'Zix – Voidreaver · Vendetta-Turnierliste (riftdecks.com)",
    "legend": "Voidreaver",
    "event": "Vendetta-Turnierliste (riftdecks.com)",
@@ -2443,7 +2375,8 @@
    ]
   },
   {
-   "weight": 1,
+   "weight": 0.25,
+   "era": "Vendetta",
    "name": "Kai'Sa – Daughter of the Void · Kernkarten aus Top-8-Listen (SCG Vegas 10K, RQ Houston) – Anzahl teils geschätzt",
    "legend": "Daughter of the Void",
    "event": "Kernkarten aus Top-8-Listen (SCG Vegas 10K, RQ Houston) – Anzahl teils geschätzt",

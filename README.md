@@ -35,6 +35,11 @@ https://content.publishing.riotgames.com/publishing-content/v2.0/public/channel/
 Workflow `update-cards.yml` läuft täglich und committet neue Sets automatisch –
 die App ist damit immer auf dem aktuellen Stand, ohne dass du etwas tust.
 
+Riots Daten enthalten bei Radiance Fehler (Einheit, Zauber und Ausrüstung
+vertauscht, einzelne falsche Farben). `scripts/card-fixes.mjs` korrigiert sie
+bei jedem Abruf: Der Kartentyp wird bei Widersprüchen aus dem Text abgeleitet,
+belegte Einzelfehler stehen mit Quelle in einer kleinen Liste.
+
 Damit das greift, muss zweierlei stimmen:
 
 * **Settings → Actions → General → Workflow permissions** auf *Read and write
@@ -118,6 +123,7 @@ js/difficulty.js      Schwierigkeit eines Decks (Einsteiger/Mittel/Fortgeschritt
 js/guide.js           Spielhilfe je Deck (aus der Deckzusammensetzung)
 js/app.js             Oberfläche und Zustand
 scripts/fetch-cards.mjs   Kartendaten von Riot holen
+scripts/card-fixes.mjs    Korrekturen für Fehler in Riots Kartendaten
 data/cards.json       generiert, wird täglich aktualisiert
 data/meta.json        Turnierlisten der Regional Qualifiers (von Hand gepflegt)
 sw.js                 Service Worker für Offline-Betrieb

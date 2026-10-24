@@ -23,6 +23,10 @@ const API = 'https://piltoverarchive.com/api/external/v1';
 const UA = { 'User-Agent': 'riftbound-collection/1.0 (+github pages app)', Accept: 'application/json', 'Content-Type': 'application/json' };
 const PER_LEGEND = 40;          // Decks je Legende
 const MAX_AGE_DAYS = 120;       // nur Decks, die in dieser Zeit bearbeitet wurden
+// Start des aktuellen Sets (Radiance-Pre-Rift): Decks ab hier zählen zuerst.
+// Ältere Decks füllen nur auf, wenn es noch zu wenige neue gibt.
+const SET_START = '2026-10-16';
+const MIN_FRESH = 8;
 const PAUSE_MS = 150;           // höflicher Abstand zwischen Anfragen
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -62,6 +66,7 @@ function ours(variant) {
 const legends = [...new Map(db.filter(c => c.type === 'legend' && !c.variant).map(c => [c.fullName, c])).values()];
 const champOf = l => (l.tags ?? []).find(t => db.some(c => c.type === 'unit' && c.subtitle && c.name === t));
 const cutoff = Date.now() - MAX_AGE_DAYS * 864e5;
+const setStart = Date.parse(SET_START);
 
 const out = {};
 const cardCache = new Map();   // Piltover-Karten-ID → unsere Karte (oder null)
@@ -72,23 +77,34 @@ for (const legend of legends) {
   // Deckliste je Legende: Suche nach dem Championnamen, beliebteste zuerst,
   // dann auf genau diese Legende filtern (Legenden-Variantennummer oder Name).
   const legendCode = /^([A-Z]+)-0*(\d+)/.exec(legend.code)?.slice(1, 3).join('-');
-  const picked = [];
-  for (let page = 1; page <= 4 && picked.length < PER_LEGEND; page++) {
-    const res = await api(`/decks?q=${encodeURIComponent(champ)}&sort=likes&dir=desc&page=${page}&limit=100`);
-    const list = unwrap(res) ?? [];
-    for (const d of list) {
-      const lv = /^([A-Z]+)-0*(\d+)/.exec(String(d.legend?.variantNumber ?? '').toUpperCase())?.slice(1, 3).join('-');
-      const sameLegend = (lv && byCode.get(lv)?.fullName === legend.fullName)
-        || norm(d.legend?.name).endsWith(norm(legend.name));
-      const fresh = !d.editedAt || Date.parse(d.editedAt) >= cutoff;
-      if (sameLegend && fresh && picked.length < PER_LEGEND) picked.push(d);
+  // Kandidaten: beliebteste und zuletzt bearbeitete Decks dieser Legende
+  const cands = new Map();
+  for (const sort of ['likes', 'updated']) {
+    for (let page = 1; page <= 4; page++) {
+      let res;
+      try { res = await api(`/decks?q=${encodeURIComponent(champ)}&sort=${sort}&dir=desc&page=${page}&limit=100`); }
+      catch (e) { if (sort === 'likes') throw e; break; }   // "updated" ist optional
+      const list = unwrap(res) ?? [];
+      for (const d of list) {
+        const lv = /^([A-Z]+)-0*(\d+)/.exec(String(d.legend?.variantNumber ?? '').toUpperCase())?.slice(1, 3).join('-');
+        const sameLegend = (lv && byCode.get(lv)?.fullName === legend.fullName)
+          || norm(d.legend?.name).endsWith(norm(legend.name));
+        const recent = !d.editedAt || Date.parse(d.editedAt) >= cutoff;
+        if (sameLegend && recent && !cands.has(d.id)) cands.set(d.id, d);
+      }
+      if (!list.length || res?.pagination?.hasNext === false) break;
     }
-    if (!list.length || res?.pagination?.hasNext === false) break;
   }
+  const byLikes = (a, b) => (b.likes ?? 0) - (a.likes ?? 0);
+  const all = [...cands.values()];
+  const freshDecks = all.filter(d => d.editedAt && Date.parse(d.editedAt) >= setStart).sort(byLikes);
+  const older = all.filter(d => !freshDecks.includes(d)).sort(byLikes);
+  // Genug Decks aus dem aktuellen Set? Dann nur diese – sonst mit älteren auffüllen.
+  const picked = (freshDecks.length >= MIN_FRESH ? freshDecks : [...freshDecks, ...older]).slice(0, PER_LEGEND);
   if (!picked.length) { console.log(`${legend.fullName}: keine Decks`); continue; }
 
   const counts = new Map();   // unsere Karte → { decks, copies }
-  let used = 0;
+  let used = 0, usedFresh = 0;
   for (const summary of picked) {
     let deck;
     try { deck = unwrap(await api(`/decks/${encodeURIComponent(summary.id)}`)); } catch (e) { console.log('  übersprungen:', e.message); continue; }
@@ -107,6 +123,7 @@ for (const legend of legends) {
     const total = [...inDeck.values()].reduce((a, b) => a + b, 0);
     if (total < 30) continue;   // unfertige Decks auslassen
     used++;
+    if (summary.editedAt && Date.parse(summary.editedAt) >= setStart) usedFresh++;
     for (const [name, n] of inDeck) {
       const h = counts.get(name) ?? { decks: 0, copies: 0 };
       h.decks++; h.copies += Math.min(n, 3); counts.set(name, h);
@@ -119,8 +136,8 @@ for (const legend of legends) {
     .filter(([, share]) => share >= 0.1)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 80);
-  out[legend.fullName] = { decks: used, cards };
-  console.log(`${legend.fullName}: ${used} Decks, ${cards.length} Karten (Top: ${cards.slice(0, 3).map(c => c[0]).join(', ')})`);
+  out[legend.fullName] = { decks: used, fresh: usedFresh, cards };
+  console.log(`${legend.fullName}: ${used} Decks (${usedFresh} seit ${SET_START}), ${cards.length} Karten (Top: ${cards.slice(0, 3).map(c => c[0]).join(', ')})`);
 }
 
 const n = Object.keys(out).length;
@@ -130,7 +147,7 @@ if (n < 5) {
   process.exit(1);
 }
 const file = new URL('../data/community.json', import.meta.url);
-const next = { source: 'piltoverarchive.com (öffentliche Decklisten, beliebteste je Legende)', perLegend: PER_LEGEND, maxAgeDays: MAX_AGE_DAYS, legends: out };
+const next = { source: 'piltoverarchive.com (öffentliche Decklisten, beliebteste je Legende)', perLegend: PER_LEGEND, maxAgeDays: MAX_AGE_DAYS, setStart: SET_START, legends: out };
 try {
   const prev = JSON.parse(await readFile(file, 'utf8'));
   if (JSON.stringify(prev.legends) === JSON.stringify(out)) { console.log('Keine Änderung.'); process.exit(0); }

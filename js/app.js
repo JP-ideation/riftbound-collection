@@ -179,8 +179,9 @@ function communityMeta() {
       total += n;
     }
     if (total < 20) return null;
-    return { name: `${championOf(legend, state.db.cards) ?? ''} – ${legend.name} · Community-Kern aus ${c.decks} Decks (Piltover Archive)`.replace(/^ – /, ''),
-      weight: 0.6, legendKey: key(legend), champion: championOf(legend, state.db.cards), cards, community: true };
+    return { name: `${championOf(legend, state.db.cards) ?? ''} – ${legend.name} · Community-Kern aus ${c.decks} Decks${c.fresh ? `, ${c.fresh} seit Radiance` : ''} (Piltover Archive)`.replace(/^ – /, ''),
+      // Mindestens 8 Decks aus dem aktuellen Set: aktueller als jede Vendetta-Turnierliste → Vorrang
+      weight: (c.fresh ?? 0) >= 8 ? 1 : 0.6, legendKey: key(legend), champion: championOf(legend, state.db.cards), cards, community: true };
   }).filter(Boolean);
 }
 
@@ -536,7 +537,7 @@ function deckKeywords(d) {
 function communityNote(d) {
   const c = state.community?.legends?.[d.legend.fullName ?? d.legend.name];
   return c ? `<p class="sub" style="margin:10px 0 0;font-size:12px">Ersatzvorschläge auf Basis von ${c.decks} beliebten
-    Community-Decks dieser Legende (Piltover Archive, Stand ${new Date(state.community.updated).toLocaleDateString('de-DE')})
+    Community-Decks dieser Legende${c.fresh ? ` (${c.fresh} davon seit Radiance)` : ''} (Piltover Archive, Stand ${new Date(state.community.updated).toLocaleDateString('de-DE')})
     und der Rolle der Karte.</p>` : '';
 }
 

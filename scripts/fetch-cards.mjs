@@ -5,6 +5,7 @@
  * Keine Abhängigkeiten, kein API-Key. Läuft via GitHub Action taeglich.
  */
 import { writeFile, mkdir, readFile } from 'node:fs/promises';
+import { fixCard } from './card-fixes.mjs';
 
 const HOST = 'https://content.publishing.riotgames.com';
 const START = '/publishing-content/v2.0/public/channel/riftbound_website/list/riftbound_gallery_cards?locale=en_US&from=0&limit=1000';
@@ -97,7 +98,8 @@ const out = {
   // weil Basisdruck und Alt-Art dieselbe Nummer tragen (OGN-007 / OGN-007a).
   // Ohne den Code als Stichentscheid wechselt die Reihenfolge je nach
   // Antwortreihenfolge der API - und die Datei aendert sich bei jedem Lauf.
-  cards: cards.map(normalize).sort((a, b) =>
+  // fixCard: Fehler in Riots Daten korrigieren (vertauschte Kartentypen u. a., s. card-fixes.mjs)
+  cards: cards.map(normalize).map(fixCard).sort((a, b) =>
     a.set.localeCompare(b.set) || (a.num ?? 0) - (b.num ?? 0)
     || a.code.localeCompare(b.code) || a.id.localeCompare(b.id)),
 };
