@@ -653,6 +653,17 @@ function snapshot(d, status) {
     main: b.main.map(m => [key(m.card), m.count]),
     runes: b.runes.map(r => [key(r.card), r.count]),
     battlefields: b.battlefields.map(x => key(x.card)),
+    ...listInfo(d),
+  };
+}
+/** Bei Listen-Decks: Original-Liste und was wodurch ersetzt wurde (für die Ziel-Ansicht in „Meine Decks“). */
+function listInfo(d) {
+  if (!d.imported && !d.listDeck) return {};
+  const b = buildOf(d);
+  return {
+    target: d.main.map(m => [key(m.card), m.count]),
+    replaced: b.replaced.map(x => [key(x.from), key(x.to), x.n]),
+    filled: b.filled.map(x => [key(x.card), x.n]),
   };
 }
 const sig = list => list.map(([k, n]) => k + n).sort().join();
@@ -788,16 +799,55 @@ function legendChampion(legend, main) {
       : `<div class="line missing"><span class="n">Keine Champion-Einheit von ${esc(champ ?? '?')} im Deck – Pflicht</span></div>`}</div>`;
 }
 
-/** Gespeicherte Liste eines angepinnten Decks, nach Farbe gruppiert. */
+/**
+ * Gespeicherte Liste eines angepinnten Decks, nach Farbe gruppiert. Bei Decks
+ * aus einer Liste umschaltbar: „Mit Ersatz“ (was du baust) und „Original-Liste“
+ * (das Ziel – fehlende Karten markiert, mit dem Ersatz, der gerade einspringt).
+ */
 function pinList(p) {
-  const main = p.main.map(([k, count]) => ({ card: pinCard(k), count })).filter(m => m.card);
+  // Ältere Pins ohne gespeicherte Original-Liste: aus der aktuellen Liste ergänzen
+  const info = p.target ? p : (p.id.startsWith('imp:') || p.id.startsWith('list:')) && currentDeck(p.id) ? listInfo(currentDeck(p.id)) : {};
+  const mode = info.target ? (state.pinView?.[p.id] ?? 'build') : 'build';
+  const card = k => pinCard(k);
+  const nameOf = k => cname(card(k) ?? { name: k });
+  const subFor = new Map(), subBy = new Map();         // Ersatz → wofür / Original → wodurch
+  for (const [from, to, n] of info.replaced ?? []) {
+    subFor.set(to, [...(subFor.get(to) ?? []), `${n}× statt ${nameOf(from)}`]);
+    subBy.set(from, [...(subBy.get(from) ?? []), `${n}× ${nameOf(to)}`]);
+  }
+  for (const [k, n] of info.filled ?? []) subFor.set(k, [...(subFor.get(k) ?? []), `${n}× Lückenfüller`]);
+  const note = txt => `<br><small class="suggest">${esc(txt)}</small>`;
+  const line = (count, c, extra = '', miss = 0) => `<div class="line${miss ? ' missing' : ''}"${cv(c)}><span class="c">${count}×</span>
+    <span class="n">${esc(cname(c))}${miss ? ` <small class="warn">fehlt ${miss}×</small>` : ''}${extra}</span><span class="e">${ident(c)}</span></div>`;
+
+  let main, rowsHtml;
+  if (mode === 'target') {
+    main = info.target.map(([k, count]) => ({ card: card(k), count })).filter(m => m.card);
+    rowsHtml = m => {
+      const miss = Math.max(0, m.count - ownedQty(key(m.card)));
+      const by = subBy.get(key(m.card));
+      return line(m.count, m.card, miss ? (by ? note('ersetzt durch ' + by.join(', ')) : note('noch kein Ersatz')) : '', miss);
+    };
+  } else {
+    main = p.main.map(([k, count]) => ({ card: card(k), count })).filter(m => m.card);
+    rowsHtml = m => line(m.count, m.card, (subFor.get(key(m.card)) ?? []).map(t => note('↺ ' + t)).join(''));
+  }
   const groups = groupByDomain({ main, identity: p.identity });
   const rows = (arr) => arr.map(m => lineRow(m.count, m.card)).join('');
   const legend = pinCard(p.legendKey);
+  const missTotal = (info.target ?? []).reduce((s, [k, n]) => s + Math.max(0, n - ownedQty(k)), 0);
+  const repTotal = (info.replaced ?? []).reduce((s, [, , n]) => s + n, 0);
+  const toggle = info.target ? `<div class="row" style="gap:6px;margin-bottom:8px">
+      <button class="btn sm ${mode === 'build' ? 'primary' : ''}" data-pinview="${esc(p.id)}" data-mode="build">Mit Ersatz (baust du jetzt)</button>
+      <button class="btn sm ${mode === 'target' ? 'primary' : ''}" data-pinview="${esc(p.id)}" data-mode="target">Original-Liste (Ziel)</button>
+    </div>
+    <p class="sub" style="margin:0 0 8px">${missTotal ? `Dir fehlen ${missTotal} Karten der Original-Liste${repTotal ? `, ${repTotal} davon sind durch eigene Karten ersetzt` : ''}.
+      ${mode === 'build' ? 'Grün markiert: was wofür einspringt.' : 'Rot: fehlt dir – darunter, womit du sie gerade ersetzt.'}` : 'Du besitzt alle Karten der Original-Liste.'}</p>` : '';
   return `<div style="margin-top:12px">
+    ${toggle}
     ${legend ? legendChampion(legend, main) : ''}
     ${groups.map(g => `<h4 class="domhead">${g.domains.map(x => `<span class="dom ${x}"></span>`).join('')} ${esc(g.label)} · ${g.count}</h4>
-      <div class="lines">${rows(g.cards)}</div>`).join('')}
+      <div class="lines">${g.cards.map(rowsHtml).join('')}</div>`).join('')}
     <h4 class="domhead">Runen</h4><div class="lines">${rows(p.runes.map(([k, count]) => ({ card: pinCard(k), count })).filter(m => m.card))}</div>
     <h4 class="domhead">Schlachtfelder</h4><div class="lines">${rows(p.battlefields.map(k => ({ card: pinCard(k), count: 1 })).filter(m => m.card))}</div>
   </div>`;
@@ -1288,6 +1338,7 @@ document.addEventListener('click', async e => {
     store(KEY.pins, pins().map(p => (p.id === t.dataset.pinstatus ? { ...p, status: p.status === 'spiele' ? 'baue' : 'spiele' } : p)));
     return render();
   }
+  if (t.dataset.pinview) { state.pinView = { ...(state.pinView ?? {}), [t.dataset.pinview]: t.dataset.mode }; return render(); }
   if (t.dataset.pinopen) { state.pinOpen = state.pinOpen === t.dataset.pinopen ? null : t.dataset.pinopen; return render(); }
 
   if (t.id === 'doImport') {
