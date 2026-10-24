@@ -461,7 +461,8 @@ export function buildDeck(inventory, legendEntry, allCards, metaDecks = [], comm
   if (metaRef) {
     const taken = new Map();
     const used = new Map(main.map(m => [key(m.card), m.count]));
-    for (const m of metaRef.missing) m.suggest = suggestFor(m.card, legal, pool, env.meta, env.community, metaRef.listKeys, taken, used, m.missing);
+    for (const m of metaRef.missing) m.suggest = suggestFor(m.card, legal, pool, env.meta, env.community, metaRef.listKeys, taken, used, m.missing,
+      { ctx: finalCtx, legendNeeds: env.legendNeeds });
   }
   if (metaRef) metaRef.lists = metaIndexSize(env.meta);
   // Rangfolge: Was du von einer Turnierliste schon umsetzt, ist erprobt und
@@ -561,7 +562,7 @@ function communityIndex(community, legend) {
  * (Community-Decks), steht sie in einer anderen Turnierliste der Legende,
  * und erfüllt sie eine ähnliche Rolle (Typ, Kosten, Funktion)?
  */
-function suggestFor(missingCard, legal, pool, meta, community, exclude = new Set(), taken = new Map(), used = new Map(), need = 1) {
+function suggestFor(missingCard, legal, pool, meta, community, exclude = new Set(), taken = new Map(), used = new Map(), need = 1, fit = null) {
   const role = roleOf(missingCard);
   // Frei = so viele Kopien, wie du besitzt und das Deck noch aufnehmen darf,
   // abzüglich der Kopien, die schon im Deck stecken oder für eine andere Lücke vorgeschlagen sind.
@@ -576,17 +577,32 @@ function suggestFor(missingCard, legal, pool, meta, community, exclude = new Set
       const inMeta = meta.has(key(o.card));
       // Schon für eine andere Lücke vorgeschlagen? Dann nach hinten.
       const penalty = (taken.get(key(o.card)) ?? 0) * 0.2;
-      const score = sim * 0.6 + share * 0.5 + (inMeta ? 0.15 : 0) - penalty;
+      // Passt die Karte ins Zieldeck? Bedingungen, die das Deck kaum erfüllt (Empowered ohne
+      // Empower-Karten, Stammes-Futter …), drücken den Vorschlag; Motor-Karten der Legende heben ihn.
+      let fitScore = 0, unmet = null, engine = false;
+      if (fit?.ctx) {
+        const a = analyze(o.card);
+        for (const n of a.needs) {
+          const have = needFeatures(n).reduce((x, f) => x + (fit.ctx.provides.get(f) ?? 0), 0);
+          const sat = satisfaction(n, have);
+          if (sat < 0.4) { fitScore -= n.mandatory ? 1 : 0.35; unmet = unmet ?? n.text; }
+        }
+        engine = (fit.legendNeeds ?? []).some(n => needFeatures(n).some(f => (a.provides.get(f) ?? 0) > 0));
+        if (engine) fitScore += 0.15;
+      }
+      const score = sim * 0.6 + share * 0.5 + (inMeta ? 0.15 : 0) - penalty + fitScore;
       const why = [];
+      if (engine) why.push('treibt die Legende an');
       if (share >= 0.15) why.push(`in ${Math.round(share * 100)} % der Community-Decks`);
       if (inMeta) why.push('in einer anderen Turnierliste dieser Legende');
       if (sim >= 0.45) why.push('ähnliche Rolle');
       else if (sim > 0) why.push('ähnliche Kosten');
       const inDeck = used.get(key(o.card)) ?? 0;
-      return { card: o.card, qty: o.qty, free: free(o), inDeck, score, why, sim, share };
+      return { card: o.card, qty: o.qty, free: free(o), inDeck, score, why, sim, share, unmet };
     })
-    // Ähnliche Kosten (sim > 0) – oder bei anderen Kosten nur, wenn viele Spieler sie nutzen
-    .filter(x => x.why.length && (x.sim > 0 || x.share >= 0.3))
+    // Ähnliche Kosten (sim > 0) – oder bei anderen Kosten nur, wenn viele Spieler sie nutzen.
+    // Karten mit einer Bedingung, die das Deck nicht erfüllt, nur, wenn Spieler dieser Legende sie trotzdem nutzen.
+    .filter(x => x.why.length && (x.sim > 0 || x.share >= 0.3) && (!x.unmet || x.share >= 0.3))
     .sort((a, b) => b.score - a.score)
     .slice(0, 2);
   // Der beste Vorschlag belegt so viele freie Kopien, wie fehlen – der zweite ist nur eine Alternative.
@@ -598,7 +614,7 @@ function suggestFor(missingCard, legal, pool, meta, community, exclude = new Set
  * Ersatzvorschläge für eine beliebige Liste (z. B. eine hochgeladene):
  * je fehlender Karte bis zu zwei eigene Karten.
  */
-export function suggestReplacements(legend, missing, inventory, allCards, community = null, metaDecks = [], used = new Map()) {
+export function suggestReplacements(legend, missing, inventory, allCards, community = null, metaDecks = [], used = new Map(), fit = null) {
   initOnce(allCards);
   const names = championNames(allCards);
   const champion = championOf(legend, allCards);
@@ -610,7 +626,7 @@ export function suggestReplacements(legend, missing, inventory, allCards, commun
   const com = communityIndex(community, legend);
   const exclude = new Set(missing.map(m => key(m.card)));
   const taken = new Map();
-  return missing.map(m => ({ ...m, suggest: suggestFor(m.card, legal, pool, meta, com, exclude, taken, used, m.missing ?? 1) }));
+  return missing.map(m => ({ ...m, suggest: suggestFor(m.card, legal, pool, meta, com, exclude, taken, used, m.missing ?? 1, fit) }));
 }
 
 /**
@@ -670,7 +686,7 @@ export function evaluateList(inventory, legend, list, allCards, community = null
   const metaRef = {
     name: list.name, coverage: need ? have / need : 0, owned: need ? have / need : 0, need,
     missing: suggestReplacements(legend, missingMain, inventory, allCards, community, metaDecks,
-      new Map(main.map(m => [key(m.card), m.have]))),
+      new Map(main.map(m => [key(m.card), m.have])), { ctx, legendNeeds: env.legendNeeds }),
     listKeys: new Set(main.map(m => key(m.card))), weight: 3, community: false, imported: true,
   };
   const missingOther = runes.reduce((s, r) => s + r.count - r.have, 0) + battlefields.reduce((s, b) => s + 1 - b.have, 0);

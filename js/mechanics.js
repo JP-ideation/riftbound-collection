@@ -202,6 +202,11 @@ export function analyze(card) {
   }
   if (/when you banish/i.test(t)) need('banish', 5, { text: 'belohnt Banish-Effekte' });
   if (/when you empower something else/i.test(t)) need('empower', 5, { text: 'belohnt Empower-Effekte' });
+  // Wirkung nur oder deutlich stärker mit einer Empowered-Einheit (Guttural Roar, Shock Blast) –
+  // nicht "If I'm [Empowered]": das empowert die Karte selbst.
+  if (/if (?:it|that unit|the unit|that)(?:'s| is) \[Empowered\]|something that's \[Empowered\]|(?:a|an|another) \[Empowered\] (?:unit|gear)/i.test(t)) {
+    need('empower', 3, { text: 'braucht Empowered-Einheiten' });
+  }
   if (/unit with \[Temporary\]/i.test(t)) need('temporary', 3, { text: 'belohnt Temporary-Einheiten' });
   if (/cards? in your trash|card with my name in your trash/i.test(t)) need('trash', 2.5, { text: 'wird mit vollem Ablagestapel stark' });
   if (/cards? with \[Hidden\]|play a card from face down|played from face down|from \[Hidden\]/i.test(t) && !hidden) need('hidden', 3, { text: 'belohnt Hidden-Karten' });
