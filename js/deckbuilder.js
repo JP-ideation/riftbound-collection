@@ -758,7 +758,27 @@ export function substituteBuild(deck, inventory, fallback = null) {
       total += n;
     }
   }
-  const main = [...out.values()];
+  // Pflicht: eine Champion-Einheit. Fehlt sie (Vorbild nutzt eine, die du nicht hast), eine eigene
+  // Champion-Einheit für die zuletzt eingesetzte Ersatzkarte nehmen.
+  const champion = deck.champion;
+  const isChamp = c => c.type === 'unit' && c.name === champion && c.subtitle;
+  if (champion && ![...out.values()].some(e => isChamp(e.card))) {
+    const cand = [...inventory.owned.values()].filter(o => isChamp(o.card) && !isBanned(o.card) && free(o.card) > 0)
+      .sort((x, y) => (fallback?.main.some(m => key(m.card) === key(y.card)) ? 1 : 0) - (fallback?.main.some(m => key(m.card) === key(x.card)) ? 1 : 0)
+        || (y.card.might ?? 0) - (x.card.might ?? 0))[0];
+    const drop = [...filled].reverse()[0]?.card ?? [...replaced].reverse()[0]?.to;
+    if (cand && (drop || total < RULES.MAIN)) {
+      if (drop && total >= RULES.MAIN) {
+        const e = out.get(key(drop));
+        e.count -= 1; used.set(key(drop), used.get(key(drop)) - 1); total -= 1;
+        e.notes.push('1× gegen Champion getauscht');
+        if (e.count <= 0) out.delete(key(drop));
+      }
+      add(cand.card, 1, 'Champion (Pflicht)');
+      total += 1;
+    }
+  }
+  const main = [...out.values()].filter(e => e.count > 0);
   const ownedAll = list => list.every(x => (x.have ?? x.count) >= x.count);
   const runes = deck.runes?.length && ownedAll(deck.runes) ? deck.runes : (fallback?.runes ?? deck.runes ?? []);
   const bfOwned = (deck.battlefields ?? []).filter(b => (b.have ?? 1) >= 1);
@@ -768,7 +788,6 @@ export function substituteBuild(deck, inventory, fallback = null) {
     if (!battlefields.some(x => key(x.card) === key(b.card))) battlefields.push(b);
   }
   const runeCount = runes.reduce((s, r) => s + r.count, 0);
-  const champion = deck.champion;
   const hasChampion = !champion || main.some(m => m.card.type === 'unit' && m.card.name === champion && m.card.subtitle);
   return {
     ...deck, main, runes, battlefields, hasChampion,

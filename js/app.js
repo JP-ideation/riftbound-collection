@@ -489,6 +489,17 @@ function viewDeckDetail(d) {
     `<div style="height:${(d.curve[b] ?? 0) / maxCurve * 100}%"><span>${d.curve[b] ?? 0}</span><i>${b === 6 ? '6+' : b}</i></div>`).join('');
 
   const L = d.imported ?? d.listDeck;   // Deck aus einer Liste (hochgeladen oder Turnier/Community)
+  // Automatisch gebautes Deck mit Vorbild-Liste: umschaltbar auf die Liste selbst oder ihren Nachbau
+  const M = L ? null : modelListOf(d);
+  const tab = M ? (state.deckTab ?? 'auto') : 'auto';
+  if (tab !== 'auto') return `
+    <div class="row" style="margin-bottom:14px"><button class="btn sm" id="backDecks">← Alle Decks</button></div>
+    <h2>${esc(deckTitle(d))}</h2>
+    ${deckTabs(d, M, tab)}
+    ${tab === 'ideal' ? idealBlock(M) : `${buildBlock(M)}
+      <div class="row" style="gap:6px">${M.listDeck ? `<button class="btn sm" data-pinlist="${esc(M.listDeck.id)}" data-status="baue">🔧 Baue ich (diese Fassung)</button>
+        <button class="btn sm" data-pinlist="${esc(M.listDeck.id)}" data-status="spiele">📌 Spiele ich (diese Fassung)</button>`
+        : `<button class="btn sm" data-pinimp="${esc(M.imported.id)}" data-status="baue">🔧 Baue ich (diese Fassung)</button>`}</div>`}`;
   return `
     <div class="row" style="margin-bottom:14px">${d.listDeck ? '<button class="btn sm" id="backMeta">← Meta-Decks</button>'
       : '<button class="btn sm" id="backDecks">← Alle Decks</button>'}</div>
@@ -505,6 +516,7 @@ function viewDeckDetail(d) {
       ${d.metaRef ? (L ? ` · du besitzt ${pct(d.metaRef.owned, 1)}% der Liste` : ` · setzt ${pct(d.metaRef.coverage, 1)}% der Turnierliste um`) : ''}
       ${tierOf(d) ? ` · <b>Tier ${tierOf(d)}</b> laut ${esc(state.meta.tiers.source)} (Stand ${new Date(state.meta.tiers.date).toLocaleDateString('de-DE')})` : ''}</p>
 
+    ${M ? deckTabs(d, M, tab) : ''}
     ${pinButtons(d)}
     ${L ? buildBlock(d) : ''}
     ${d.metaRef && !L && d.metaRef.owned < 0.7 ? `<div class="notice" style="margin-bottom:16px"><b>Nur ${pct(d.metaRef.owned, 1)}% der
@@ -605,6 +617,47 @@ function pathBlock(d) {
   </div>`;
 }
 
+/** Die Vorbild-Liste eines automatisch gebauten Decks als Listen-Deck (Turnier/Community oder hochgeladen). */
+function modelListOf(d) {
+  const name = d.metaRef?.name;
+  if (!name) return null;
+  return listDecks().find(x => x.listDeck.name === name && key(x.legend) === key(d.legend))
+    ?? importedDecks().find(x => x.imported.name === name && key(x.legend) === key(d.legend)) ?? null;
+}
+
+/** Umschalter: dein frei gebautes Deck – die Vorbild-Liste – die Vorbild-Liste mit deinem Ersatz. */
+function deckTabs(d, M, tab) {
+  const btn = (k, label) => `<button class="btn sm ${tab === k ? 'primary' : ''}" data-decktab="${k}">${label}</button>`;
+  const kind = M.listDeck?.kind ?? 'hochgeladene Liste';
+  return `<div class="card" style="margin-bottom:14px;padding:10px">
+    <div class="row" style="gap:6px">${btn('auto', 'Dein Deck')}${btn('ideal', `Vorbild-Liste (ideal)`)}${btn('subst', 'Vorbild mit deinem Ersatz')}</div>
+    <p class="sub" style="margin:8px 0 0;font-size:12px">Vorbild: <b>${esc((M.listDeck ?? M.imported).name)}</b> (${esc(kind)}) – davon besitzt du
+      ${pct(M.metaRef.owned, 1)}%. „Dein Deck“ ist frei aus deiner Sammlung gebaut, „Vorbild mit deinem Ersatz“ bleibt so nah wie
+      möglich an der Liste.</p></div>`;
+}
+
+/** Die Vorbild-Liste unverändert – fehlende Karten markiert, kopierbar (z. B. für Rift Atlas oder TCG Arena). */
+function idealBlock(M) {
+  const miss = M.metaRef.missing.reduce((s, x) => s + x.missing, 0);
+  return `<div class="wishbox" style="margin-bottom:16px">
+    <h3 class="wishhead">Vorbild-Liste, unverändert · ${M.counts.main}/40</h3>
+    <p class="sub" style="margin:0 0 10px">${miss ? `Rot: Dir fehlen ${miss} Karten – darunter steht, womit du sie ersetzen kannst.` : 'Du besitzt alle Karten dieser Liste.'}
+      Runen und Schlachtfelder stehen nicht in der Liste und sind aus deinem Bestand ergänzt.</p>
+    ${legendChampion(M.legend, M.main)}
+    ${groupByDomain(M).map(g => `<h4 class="domhead">${g.domains.map(x => `<span class="dom ${x}"></span>`).join('')} ${esc(g.label)} · ${g.count}</h4>
+      <div class="lines">${g.cards.map(m => {
+        const mi = M.metaRef.missing.find(x => key(x.card) === key(m.card));
+        return `<div class="line${m.missing ? ' missing' : ''}"${cv(m.card)}><span class="c">${m.count}×</span><span class="n">${esc(cname(m.card))}${m.missing ? ` <small class="warn">fehlt ${m.missing}×</small>` : ''}${mi ? suggestLine(mi) : ''}</span><span class="e">${ident(m.card)}</span></div>`;
+      }).join('')}</div>`).join('')}
+    <p class="sub" style="margin:8px 0 0">Runen: ${M.runes.map(r => `${r.count}× ${esc(r.card.name)}`).join(', ') || '–'} ·
+      Schlachtfelder: ${M.battlefields.map(x => esc(x.card.name)).join(', ') || '–'}</p>
+    <div class="row" style="margin-top:12px">
+      <button class="btn primary" data-copyideal="arena" data-src="${esc(deckId(M))}">Vorbild-Liste kopieren (TCG Arena / Rift Atlas)</button>
+      <button class="btn" data-copyideal="text" data-src="${esc(deckId(M))}">Mit Set-Nummern kopieren</button>
+    </div>
+  </div>`;
+}
+
 /**
  * Die Liste mit deiner Sammlung nachgebaut: fehlende Karten durch Ersatz aus
  * deinem Bestand ersetzt, Lücken aus deinem besten Deck dieser Legende gefüllt.
@@ -627,8 +680,8 @@ function buildBlock(d) {
     <p class="sub" style="margin:8px 0 0">Runen: ${b.runes.map(r => `${r.count}× ${esc(r.card.name)}`).join(', ') || '–'} ·
       Schlachtfelder: ${b.battlefields.map(x => esc(x.card.name)).join(', ') || '–'}</p>
     <div class="row" style="margin-top:12px">
-      <button class="btn primary" data-copybuild="arena">Nachbau für TCG Arena kopieren</button>
-      <button class="btn" data-copybuild="text">Nachbau als Liste kopieren</button>
+      <button class="btn primary" data-copybuild="arena" data-src="${esc(deckId(d))}">Nachbau für TCG Arena kopieren</button>
+      <button class="btn" data-copybuild="text" data-src="${esc(deckId(d))}">Nachbau als Liste kopieren</button>
     </div>
   </details>`;
 }
@@ -1317,12 +1370,17 @@ document.addEventListener('click', async e => {
     if (d) store(KEY.pins, [...pins().filter(p => p.id !== deckId(d)), snapshot(d, t.dataset.status)]);
     return render();
   }
+  if (t.dataset.decktab) { state.deckTab = t.dataset.decktab; return render(); }
+  if (t.dataset.copyideal) {
+    const d = currentDeck(t.dataset.src);
+    if (d) return copy(t.dataset.copyideal === 'arena' ? deckToArena(d) : deckToText(d), t);
+  }
   if (t.dataset.copybuild) {
-    const d = detailDeck();
+    const d = (t.dataset.src && currentDeck(t.dataset.src)) || detailDeck();
     if (d) return copy(t.dataset.copybuild === 'arena' ? deckToArena(buildOf(d)) : deckToText(buildOf(d)), t);
   }
-  if (t.dataset.deck) { state.deckIdx = +t.dataset.deck; return render(); }
-  if (t.id === 'backDecks') { state.deckIdx = null; return render(); }
+  if (t.dataset.deck) { state.deckIdx = +t.dataset.deck; state.deckTab = 'auto'; return render(); }
+  if (t.id === 'backDecks') { state.deckIdx = null; state.deckTab = 'auto'; return render(); }
   if (t.dataset.pin) {
     const d = detailDeck();
     if (d) store(KEY.pins, [...pins().filter(p => p.id !== deckId(d)), snapshot(d, t.dataset.pin)]);

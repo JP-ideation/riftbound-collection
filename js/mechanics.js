@@ -31,6 +31,7 @@ export const FEATURE_LABEL = {
   token: 'Token-Erzeuger',
   banish: 'Banish-Effekte',
   empower: 'Empower-Effekte',
+  shield: 'Shield-Karten',
   temporary: 'Temporary-Einheiten',
   trash: 'Karten, die den Ablagestapel füllen',
   hidden: 'Hidden-Karten',
@@ -138,6 +139,10 @@ export function analyze(card) {
   if (/\[Stun\]|\bstun (?:a|an|it|up|all|each|target)/i.test(t)) add(provides, 'stun');
   if (/\[Buff\]|\bbuff (?:a|an|me|it|up|all|another|each|two)/i.test(t)) add(provides, 'buff');
   if (/\[Empower\]|\bempower (?:a|an|another|something|it|up)/i.test(t)) add(provides, 'empower');
+  // Shield: eigene Einheiten mit [Shield N] und Karten, die Shield verteilen (Zauber, Ausrüstung,
+  // Deploy-Gear) – K'Santes Legende macht daraus Angriffskraft.
+  const sh = /\[Shield(?: (\d+))?\]/.exec(t);
+  if (sh && card.type !== 'legend' && (card.type === 'unit' || /\b(?:give|have|has|gets?|double)\b[^.]*\[Shield/i.test(t))) add(provides, 'shield', Math.min(1.5, 0.75 + 0.25 * (+sh[1] || 1)));
   if (/\bbanish\b/i.test(t) && !/when you banish/i.test(t)) add(provides, 'banish');
   if (/\bdiscard \d|\[Burn|put [^.]*? into your trash/i.test(t) || card.type === 'spell') add(provides, 'trash', card.type === 'spell' ? 0.5 : 1);
 
@@ -202,6 +207,10 @@ export function analyze(card) {
   }
   if (/when you banish/i.test(t)) need('banish', 5, { text: 'belohnt Banish-Effekte' });
   if (/when you empower something else/i.test(t)) need('empower', 5, { text: 'belohnt Empower-Effekte' });
+  // Wirkung abhängig vom Shield (K'Sante: Assault = Shield; Ntofo Strikes: Schaden = Shield)
+  if (/equal to (?:my|its|their|that unit's) \[Shield\]|double the \[Shield\]/i.test(t)) {
+    need('shield', card.type === 'legend' ? 6 : 2.5, { text: card.type === 'legend' ? 'macht aus Shield Angriffskraft' : 'wird mit Shield-Einheiten stark' });
+  }
   // Wirkung nur oder deutlich stärker mit einer Empowered-Einheit (Guttural Roar, Shock Blast) –
   // nicht "If I'm [Empowered]": das empowert die Karte selbst.
   if (/if (?:it|that unit|the unit|that)(?:'s| is) \[Empowered\]|something that's \[Empowered\]|(?:a|an|another) \[Empowered\] (?:unit|gear)/i.test(t)) {
