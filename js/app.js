@@ -710,10 +710,24 @@ function snapshot(d, status) {
   };
 }
 /** Bei Listen-Decks: Original-Liste und was wodurch ersetzt wurde (für die Ziel-Ansicht in „Meine Decks“). */
+const modelInfo = M => ({
+  target: M.main.map(m => [key(m.card), m.count]),
+  targetName: (M.listDeck ?? M.imported).name,
+  sugg: M.metaRef.missing.map(x => [key(x.card), (x.suggest ?? []).map(s => key(s.card))]),
+});
 function listInfo(d) {
-  if (!d.imported && !d.listDeck) return {};
+  if (!d.imported && !d.listDeck) {
+    // Frei gebautes Deck: Vorbild-Liste als Ziel merken, dazu die Ersatzvorschläge je fehlender Karte
+    const M = modelListOf(d);
+    return M ? { ...modelInfo(M), auto: true } : {};
+  }
   const b = buildOf(d);
+  // Zusätzlich: die Vorbild-Liste der Legende (Community/Turnier), falls es eine andere Liste ist
+  const auto = decks().find(x => !x.imported && key(x.legend) === key(d.legend));
+  const M = auto && modelListOf(auto);
+  const own = (d.imported ?? d.listDeck).name;
   return {
+    model: M && (M.listDeck ?? M.imported).name !== own ? modelInfo(M) : null,
     target: d.main.map(m => [key(m.card), m.count]),
     replaced: b.replaced.map(x => [key(x.from), key(x.to), x.n]),
     filled: b.filled.map(x => [key(x.card), x.n]),
@@ -859,8 +873,10 @@ function legendChampion(legend, main) {
  */
 function pinList(p) {
   // Ältere Pins ohne gespeicherte Original-Liste: aus der aktuellen Liste ergänzen
-  const info = p.target ? p : (p.id.startsWith('imp:') || p.id.startsWith('list:')) && currentDeck(p.id) ? listInfo(currentDeck(p.id)) : {};
-  const mode = info.target ? (state.pinView?.[p.id] ?? 'build') : 'build';
+  // Ältere Pins ohne gespeichertes Ziel: aus dem aktuellen Deck ergänzen
+  const info = p.target ? p : currentDeck(p.id) ? listInfo(currentDeck(p.id)) : {};
+  let mode = info.target ? (state.pinView?.[p.id] ?? 'build') : 'build';
+  if (mode === 'model' && !info.model) mode = 'build';
   const card = k => pinCard(k);
   const nameOf = k => cname(card(k) ?? { name: k });
   const subFor = new Map(), subBy = new Map();         // Ersatz → wofür / Original → wodurch
@@ -869,33 +885,39 @@ function pinList(p) {
     subBy.set(from, [...(subBy.get(from) ?? []), `${n}× ${nameOf(to)}`]);
   }
   for (const [k, n] of info.filled ?? []) subFor.set(k, [...(subFor.get(k) ?? []), `${n}× Lückenfüller`]);
+  const sugg = new Map((mode === 'model' ? info.model?.sugg : info.sugg) ?? []);
+  const inTarget = new Set((info.target ?? []).map(([k]) => k));
   const note = txt => `<br><small class="suggest">${esc(txt)}</small>`;
   const line = (count, c, extra = '', miss = 0) => `<div class="line${miss ? ' missing' : ''}"${cv(c)}><span class="c">${count}×</span>
     <span class="n">${esc(cname(c))}${miss ? ` <small class="warn">fehlt ${miss}×</small>` : ''}${extra}</span><span class="e">${ident(c)}</span></div>`;
 
   let main, rowsHtml;
-  if (mode === 'target') {
-    main = info.target.map(([k, count]) => ({ card: card(k), count })).filter(m => m.card);
+  if (mode === 'target' || mode === 'model') {
+    main = (mode === 'model' ? info.model.target : info.target).map(([k, count]) => ({ card: card(k), count })).filter(m => m.card);
     rowsHtml = m => {
       const miss = Math.max(0, m.count - ownedQty(key(m.card)));
-      const by = subBy.get(key(m.card));
-      return line(m.count, m.card, miss ? (by ? note('ersetzt durch ' + by.join(', ')) : note('noch kein Ersatz')) : '', miss);
+      const by = mode === 'target' ? subBy.get(key(m.card)) : null;
+      const alt = (sugg.get(key(m.card)) ?? []).map(nameOf);
+      return line(m.count, m.card, miss ? (by ? note('ersetzt durch ' + by.join(', '))
+        : alt.length ? note('Ersatz aus deiner Sammlung: ' + alt.join(' oder ')) : note('noch kein Ersatz')) : '', miss);
     };
   } else {
     main = p.main.map(([k, count]) => ({ card: card(k), count })).filter(m => m.card);
-    rowsHtml = m => line(m.count, m.card, (subFor.get(key(m.card)) ?? []).map(t => note('↺ ' + t)).join(''));
+    rowsHtml = m => line(m.count, m.card, (subFor.get(key(m.card)) ?? []).map(t => note('↺ ' + t)).join('')
+      + (info.auto && !inTarget.has(key(m.card)) ? note('nicht in der Vorbild-Liste – eigene Wahl der App') : ''));
   }
   const groups = groupByDomain({ main, identity: p.identity });
   const rows = (arr) => arr.map(m => lineRow(m.count, m.card)).join('');
   const legend = pinCard(p.legendKey);
-  const missTotal = (info.target ?? []).reduce((s, [k, n]) => s + Math.max(0, n - ownedQty(k)), 0);
+  const missTotal = ((mode === 'model' ? info.model?.target : info.target) ?? []).reduce((s, [k, n]) => s + Math.max(0, n - ownedQty(k)), 0);
   const repTotal = (info.replaced ?? []).reduce((s, [, , n]) => s + n, 0);
   const toggle = info.target ? `<div class="row" style="gap:6px;margin-bottom:8px">
-      <button class="btn sm ${mode === 'build' ? 'primary' : ''}" data-pinview="${esc(p.id)}" data-mode="build">Mit Ersatz (baust du jetzt)</button>
-      <button class="btn sm ${mode === 'target' ? 'primary' : ''}" data-pinview="${esc(p.id)}" data-mode="target">Original-Liste (Ziel)</button>
+      <button class="btn sm ${mode === 'build' ? 'primary' : ''}" data-pinview="${esc(p.id)}" data-mode="build">${info.auto ? 'Dein Deck (gespeichert)' : 'Mit Ersatz (baust du jetzt)'}</button>
+      <button class="btn sm ${mode === 'target' ? 'primary' : ''}" data-pinview="${esc(p.id)}" data-mode="target">${info.auto ? 'Vorbild-Liste (Ziel)' : 'Original-Liste (Ziel)'}</button>
+      ${info.model ? `<button class="btn sm ${mode === 'model' ? 'primary' : ''}" data-pinview="${esc(p.id)}" data-mode="model">Vorbild-Liste (Community)</button>` : ''}
     </div>
-    <p class="sub" style="margin:0 0 8px">${missTotal ? `Dir fehlen ${missTotal} Karten der Original-Liste${repTotal ? `, ${repTotal} davon sind durch eigene Karten ersetzt` : ''}.
-      ${mode === 'build' ? 'Grün markiert: was wofür einspringt.' : 'Rot: fehlt dir – darunter, womit du sie gerade ersetzt.'}` : 'Du besitzt alle Karten der Original-Liste.'}</p>` : '';
+    <p class="sub" style="margin:0 0 8px">${mode === 'model' ? `Vorbild: <b>${esc(info.model.targetName)}</b>. ` : info.auto ? `Vorbild: <b>${esc(info.targetName ?? '')}</b>. ` : ''}${missTotal ? `Dir fehlen ${missTotal} Karten der ${info.auto || mode === 'model' ? 'Vorbild' : 'Original'}-Liste${repTotal && mode === 'target' ? `, ${repTotal} davon sind durch eigene Karten ersetzt` : ''}.
+      ${mode === 'build' ? (info.auto ? 'Grün markiert: Karten, die nicht in der Vorbild-Liste stehen.' : 'Grün markiert: was wofür einspringt.') : 'Rot: fehlt dir – darunter, womit du sie ersetzen kannst.'}` : 'Du besitzt alle Karten der Vorbild-Liste.'}</p>` : '';
   return `<div style="margin-top:12px">
     ${toggle}
     ${legend ? legendChampion(legend, main) : ''}
