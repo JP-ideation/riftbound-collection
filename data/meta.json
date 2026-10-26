@@ -1,5 +1,5 @@
 {
- "updated": "2026-10-24",
+ "updated": "2026-10-26",
  "tiers": {
   "source": "vorläufig: riftbound.gg Radiance-Day-1-Bericht (22.10.) + Vendetta-Tierliste (09.10.)",
   "date": "2026-10-22",
@@ -24,7 +24,7 @@
    "Prodigal Explorer": 3
   }
  },
- "note": "Kernlisten aus Top-8- und Best-Of-Decks der Regional Qualifiers der Vendetta-Saison (Utrecht, Barcelona, Singapur, Sydney, Hartford, Vancouver, Atlanta, Los Angeles) und Turniere nach dem Bann vom 18.09. (RQ Los Angeles: Rengar, Irelia, Azir; Kennen: Convergence #3). Aus öffentlich einsehbaren Turnierberichten übernommen und gegen die offizielle Kartendatenbank, die Domain-Identität der Legende und die Bannliste vom 18.09.2026 geprüft. Listen nach dem Bann zählen doppelt. Teils unvollständig; Sideboards nicht enthalten. Seit Radiance (23.10.) zählen diese Vendetta-Listen nur noch ein Viertel – wo es genug Radiance-Decks gibt, ist die Community-Kernliste das Vorbild.",
+ "note": "Kernlisten aus Top-8- und Best-Of-Decks der Regional Qualifiers der Vendetta-Saison (Utrecht, Barcelona, Singapur, Sydney, Hartford, Vancouver, Atlanta, Los Angeles) und Turniere nach dem Bann vom 18.09. (RQ Los Angeles: Rengar, Irelia, Azir; Kennen: Convergence #3). Aus öffentlich einsehbaren Turnierberichten übernommen und gegen die offizielle Kartendatenbank, die Domain-Identität der Legende und die Bannliste vom 18.09.2026 geprüft. Listen nach dem Bann zählen doppelt. Teils unvollständig; Sideboards nicht enthalten. Seit Radiance (23.10.) zählen diese Vendetta-Listen nur noch ein Viertel – wo es genug Radiance-Decks gibt, ist die Community-Kernliste das Vorbild. Erste Radiance-Turnierlisten: Runes & Rift Open #25 (18.10., 22 Spieler, Rift Atlas).",
  "decks": [
   {
    "weight": 0.5,
@@ -206,6 +206,358 @@
     ],
     [
      "Zhonya's Hourglass",
+     2
+    ]
+   ]
+  },
+  {
+   "weight": 1.2,
+   "era": "Radiance",
+   "name": "Kennen – Heart of the Tempest · Runes & Rift Open #25 (Simple) – Radiance, 22 Spieler",
+   "legend": "Heart of the Tempest",
+   "event": "Runes & Rift Open #25 (Simple) – Radiance, 22 Spieler",
+   "placement": "1.",
+   "date": "2026-10-18",
+   "source": "runesandrift.com",
+   "cards": [
+    [
+     "Kennen, Storm of Shuriken",
+     1
+    ],
+    [
+     "Traveling Merchant",
+     3
+    ],
+    [
+     "Rhasa the Sunderer",
+     3
+    ],
+    [
+     "Seal of Discord",
+     3
+    ],
+    [
+     "Tail-Cloaked Matriarch",
+     3
+    ],
+    [
+     "Lightning Rush",
+     3
+    ],
+    [
+     "Trifarian Captain",
+     3
+    ],
+    [
+     "Gust",
+     2
+    ],
+    [
+     "Ride the Wind",
+     2
+    ],
+    [
+     "Last Rites",
+     2
+    ],
+    [
+     "Tornado Warrior",
+     2
+    ],
+    [
+     "Bedeviling Stranger",
+     2
+    ],
+    [
+     "Flash",
+     1
+    ],
+    [
+     "Switcheroo",
+     1
+    ],
+    [
+     "Star-Crossed",
+     1
+    ],
+    [
+     "Shadows of the Past",
+     1
+    ],
+    [
+     "An Offer You Can't Refuse",
+     1
+    ],
+    [
+     "Nocturne, Horrifying",
+     3
+    ],
+    [
+     "Fizz, Trickster",
+     2
+    ],
+    [
+     "Ezreal, Prodigy",
+     1
+    ]
+   ]
+  },
+  {
+   "weight": 1.2,
+   "era": "Radiance",
+   "name": "Kai'Sa – Daughter of the Void · Runes & Rift Open #25 (Art3mis) – Radiance, 22 Spieler",
+   "legend": "Daughter of the Void",
+   "event": "Runes & Rift Open #25 (Art3mis) – Radiance, 22 Spieler",
+   "placement": "2.",
+   "date": "2026-10-18",
+   "source": "runesandrift.com",
+   "cards": [
+    [
+     "Kai'Sa, Survivor",
+     1
+    ],
+    [
+     "Hextech Ray",
+     3
+    ],
+    [
+     "Noxus Hopeful",
+     3
+    ],
+    [
+     "Brynhir Thundersong",
+     3
+    ],
+    [
+     "Falling Star",
+     3
+    ],
+    [
+     "Stupefy",
+     3
+    ],
+    [
+     "Watchful Sentry",
+     3
+    ],
+    [
+     "Thousand-Tailed Watcher",
+     3
+    ],
+    [
+     "Plundering Poro",
+     3
+    ],
+    [
+     "Temporal Breach",
+     3
+    ],
+    [
+     "Lecturing Yordle",
+     2
+    ],
+    [
+     "Smoke Screen",
+     2
+    ],
+    [
+     "Bilgewater Tracker",
+     2
+    ],
+    [
+     "The Empyrean",
+     2
+    ],
+    [
+     "Orb of Regret",
+     1
+    ],
+    [
+     "Time Warp",
+     1
+    ],
+    [
+     "Bellows Breath",
+     1
+    ],
+    [
+     "Lost to the Sands",
+     1
+    ]
+   ]
+  },
+  {
+   "weight": 1.2,
+   "era": "Radiance",
+   "name": "Riven – The Exile · Runes & Rift Open #25 (AA Romomo) – Radiance, 22 Spieler",
+   "legend": "The Exile",
+   "event": "Runes & Rift Open #25 (AA Romomo) – Radiance, 22 Spieler",
+   "placement": "3.",
+   "date": "2026-10-18",
+   "source": "runesandrift.com",
+   "cards": [
+    [
+     "Riven, Broken Blade",
+     1
+    ],
+    [
+     "Defy",
+     3
+    ],
+    [
+     "Discipline",
+     3
+    ],
+    [
+     "Zhonya's Hourglass",
+     3
+    ],
+    [
+     "Stellacorn Herder",
+     3
+    ],
+    [
+     "Astral Heron",
+     3
+    ],
+    [
+     "Reckless Innovator",
+     3
+    ],
+    [
+     "Bedeviling Stranger",
+     3
+    ],
+    [
+     "Blade of the Exile",
+     3
+    ],
+    [
+     "Meditation",
+     2
+    ],
+    [
+     "Tideturner",
+     2
+    ],
+    [
+     "Scuttle Crab",
+     2
+    ],
+    [
+     "Battle Preparations",
+     2
+    ],
+    [
+     "Gust",
+     1
+    ],
+    [
+     "Rebuke",
+     1
+    ],
+    [
+     "Star-Crossed",
+     1
+    ],
+    [
+     "Abandon",
+     1
+    ],
+    [
+     "Baron Nashor",
+     1
+    ],
+    [
+     "Ki Burst",
+     1
+    ],
+    [
+     "Siren's Song",
+     1
+    ]
+   ]
+  },
+  {
+   "weight": 1.2,
+   "era": "Radiance",
+   "name": "Ekko – Boy Who Shattered Time · Runes & Rift Open #25 (Yaw) – Radiance, 22 Spieler",
+   "legend": "Boy Who Shattered Time",
+   "event": "Runes & Rift Open #25 (Yaw) – Radiance, 22 Spieler",
+   "placement": "6.",
+   "date": "2026-10-18",
+   "source": "runesandrift.com",
+   "cards": [
+    [
+     "Ekko, Ingenious",
+     1
+    ],
+    [
+     "Noxus Hopeful",
+     3
+    ],
+    [
+     "Stupefy",
+     3
+    ],
+    [
+     "Inferna",
+     3
+    ],
+    [
+     "Plundering Poro",
+     3
+    ],
+    [
+     "Cleave",
+     2
+    ],
+    [
+     "Brynhir Thundersong",
+     2
+    ],
+    [
+     "Falling Star",
+     2
+    ],
+    [
+     "Thousand-Tailed Watcher",
+     2
+    ],
+    [
+     "Time Warp",
+     2
+    ],
+    [
+     "Mischievous Marai",
+     2
+    ],
+    [
+     "Shock Blast",
+     2
+    ],
+    [
+     "Temporal Breach",
+     2
+    ],
+    [
+     "Bilgewater Tracker",
+     2
+    ],
+    [
+     "Kai'Sa, Survivor",
+     3
+    ],
+    [
+     "Vayne, Hunter",
+     2
+    ],
+    [
+     "Pyke, Dockside Butcher",
+     2
+    ],
+    [
+     "Ekko, Revolutionary",
      2
     ]
    ]

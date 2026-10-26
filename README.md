@@ -36,9 +36,11 @@ Workflow `update-cards.yml` läuft täglich und committet neue Sets automatisch 
 die App ist damit immer auf dem aktuellen Stand, ohne dass du etwas tust.
 
 Riots Daten enthalten bei Radiance Fehler (Einheit, Zauber und Ausrüstung
-vertauscht, einzelne falsche Farben). `scripts/card-fixes.mjs` korrigiert sie
-bei jedem Abruf: Der Kartentyp wird bei Widersprüchen aus dem Text abgeleitet,
-belegte Einzelfehler stehen mit Quelle in einer kleinen Liste.
+vertauscht oder „unknown“, rund 30 falsche Farben). `scripts/card-fixes.mjs`
+korrigiert sie bei jedem Abruf: Die Farbe kommt aus dem Nummernblock des Sets
+(einfarbige Karten sind nach Farbe nummeriert, je 23 pro Farbe – geprüft gegen
+echte Community-Decks), der Kartentyp wird bei Widersprüchen aus dem Text
+abgeleitet, belegte Einzelfehler stehen mit Quelle in einer kleinen Liste.
 
 Damit das greift, muss zweierlei stimmen:
 
