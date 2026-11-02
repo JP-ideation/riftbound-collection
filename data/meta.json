@@ -1,30 +1,38 @@
 {
- "updated": "2026-10-26",
+ "updated": "2026-11-02",
  "tiers": {
-  "source": "vorläufig: riftbound.gg Radiance-Day-1-Bericht (22.10.) + Vendetta-Tierliste (09.10.)",
-  "date": "2026-10-22",
+  "source": "riftbound.zone Radiance-Tierliste (S/A/B)",
+  "date": "2026-11-01",
   "legends": {
    "The Exile": 1,
-   "Heart of the Tempest": 1,
    "Daughter of the Void": 1,
-   "Rogue Assassin": 2,
+   "Heart of the Tempest": 1,
    "Blade Dancer": 2,
-   "Wuju Bladesman, Starter": 2,
+   "Defender of Tomorrow": 2,
    "Pridestalker": 2,
-   "Deceiver": 2,
+   "Lady of Clockwork": 2,
+   "Void Burrower": 2,
+   "Gloomist": 2,
+   "Rogue Assassin": 2,
+   "Agony's Embrace": 2,
+   "Herald of the Arcane": 2,
+   "Wuju Bladesman, Starter": 2,
    "Emperor of the Sands": 2,
-   "Gloomist": 3,
-   "Defender of Tomorrow": 3,
-   "Void Burrower": 3,
-   "Grand Duelist": 3,
+   "Deceiver": 2,
+   "Iron Revenant": 2,
+   "Prodigal Explorer": 2,
+   "Scorn of the Moon": 3,
    "Voidreaver": 3,
    "Fire Below the Mountain": 3,
-   "Scorn of the Moon": 3,
+   "Curator of the Sands": 3,
+   "Bloodharbor Ripper": 3,
    "Purifier": 3,
-   "Prodigal Explorer": 3
+   "Grand Duelist": 3,
+   "Glorious Executioner": 3,
+   "Bashful Bloom": 3
   }
  },
- "note": "Kernlisten aus Top-8- und Best-Of-Decks der Regional Qualifiers der Vendetta-Saison (Utrecht, Barcelona, Singapur, Sydney, Hartford, Vancouver, Atlanta, Los Angeles) und Turniere nach dem Bann vom 18.09. (RQ Los Angeles: Rengar, Irelia, Azir; Kennen: Convergence #3). Aus öffentlich einsehbaren Turnierberichten übernommen und gegen die offizielle Kartendatenbank, die Domain-Identität der Legende und die Bannliste vom 18.09.2026 geprüft. Listen nach dem Bann zählen doppelt. Teils unvollständig; Sideboards nicht enthalten. Seit Radiance (23.10.) zählen diese Vendetta-Listen nur noch ein Viertel – wo es genug Radiance-Decks gibt, ist die Community-Kernliste das Vorbild. Erste Radiance-Turnierlisten: Runes & Rift Open #25 (18.10., 22 Spieler, Rift Atlas).",
+ "note": "Kernlisten aus Top-8- und Best-Of-Decks der Regional Qualifiers der Vendetta-Saison (Utrecht, Barcelona, Singapur, Sydney, Hartford, Vancouver, Atlanta, Los Angeles) und Turniere nach dem Bann vom 18.09. (RQ Los Angeles: Rengar, Irelia, Azir; Kennen: Convergence #3). Aus öffentlich einsehbaren Turnierberichten übernommen und gegen die offizielle Kartendatenbank, die Domain-Identität der Legende und die Bannliste vom 18.09.2026 geprüft. Listen nach dem Bann zählen doppelt. Teils unvollständig; Sideboards nicht enthalten. Seit Radiance (23.10.) zählen diese Vendetta-Listen nur noch ein Viertel – wo es genug Radiance-Decks gibt, ist die Community-Kernliste das Vorbild. Radiance-Turnierlisten: LDXP Sacramento Showdown (26.10., 755 Spieler) und Runes & Rift Open #25 (18.10., 22 Spieler).",
  "decks": [
   {
    "weight": 0.5,
@@ -207,6 +215,434 @@
     [
      "Zhonya's Hourglass",
      2
+    ]
+   ]
+  },
+  {
+   "weight": 2,
+   "era": "Radiance",
+   "name": "Riven – The Exile · LDXP Sacramento Riftbound Showdown (Nam Dang) – Radiance, 755 Spieler",
+   "legend": "The Exile",
+   "event": "LDXP Sacramento Riftbound Showdown (Nam Dang) – Radiance, 755 Spieler",
+   "placement": "1.",
+   "date": "2026-10-26",
+   "source": "runesandrift.com",
+   "cards": [
+    [
+     "Riven, Broken Blade",
+     1
+    ],
+    [
+     "Astral Heron",
+     3
+    ],
+    [
+     "Battle Preparations",
+     2
+    ],
+    [
+     "Bedeviling Stranger",
+     2
+    ],
+    [
+     "Blade of the Exile",
+     3
+    ],
+    [
+     "Blitzcrank, Impassive",
+     2
+    ],
+    [
+     "Defy",
+     3
+    ],
+    [
+     "Discipline",
+     3
+    ],
+    [
+     "Gust",
+     2
+    ],
+    [
+     "Not So Fast",
+     1
+    ],
+    [
+     "Rebuke",
+     1
+    ],
+    [
+     "Reckless Innovator",
+     2
+    ],
+    [
+     "Scuttle Crab",
+     3
+    ],
+    [
+     "Star-Crossed",
+     1
+    ],
+    [
+     "Stellacorn Herder",
+     3
+    ],
+    [
+     "Switcheroo",
+     2
+    ],
+    [
+     "Tideturner",
+     3
+    ],
+    [
+     "Zhonya's Hourglass",
+     3
+    ]
+   ]
+  },
+  {
+   "weight": 2,
+   "era": "Radiance",
+   "name": "Viktor – Herald of the Arcane · LDXP Sacramento Riftbound Showdown (Calvin Jin) – Radiance, 755 Spieler",
+   "legend": "Herald of the Arcane",
+   "event": "LDXP Sacramento Riftbound Showdown (Calvin Jin) – Radiance, 755 Spieler",
+   "placement": "2.",
+   "date": "2026-10-26",
+   "source": "runesandrift.com",
+   "cards": [
+    [
+     "Viktor, Leader",
+     1
+    ],
+    [
+     "B.F. Sword",
+     1
+    ],
+    [
+     "Bellows Breath",
+     3
+    ],
+    [
+     "Blood Money",
+     1
+    ],
+    [
+     "Carrion Dredger",
+     3
+    ],
+    [
+     "Concert Poster",
+     3
+    ],
+    [
+     "Cull the Weak",
+     3
+    ],
+    [
+     "Facebreaker",
+     1
+    ],
+    [
+     "Hidden Blade",
+     3
+    ],
+    [
+     "Imperial Decree",
+     3
+    ],
+    [
+     "Kennen, Keeper of Balance",
+     1
+    ],
+    [
+     "Salvage",
+     1
+    ],
+    [
+     "Shadow's Call",
+     3
+    ],
+    [
+     "Sprite Burst",
+     3
+    ],
+    [
+     "Sprite Fountain",
+     3
+    ],
+    [
+     "Stupefy",
+     3
+    ],
+    [
+     "Thousand-Tailed Watcher",
+     1
+    ],
+    [
+     "Wages of Pain",
+     3
+    ]
+   ]
+  },
+  {
+   "weight": 2,
+   "era": "Radiance",
+   "name": "Akali – Rogue Assassin · LDXP Sacramento Riftbound Showdown (Alex Gorica) – Radiance, 755 Spieler",
+   "legend": "Rogue Assassin",
+   "event": "LDXP Sacramento Riftbound Showdown (Alex Gorica) – Radiance, 755 Spieler",
+   "placement": "3.",
+   "date": "2026-10-26",
+   "source": "runesandrift.com",
+   "cards": [
+    [
+     "Akali, Deadly Weapon",
+     1
+    ],
+    [
+     "Astral Heron",
+     3
+    ],
+    [
+     "Back Off",
+     2
+    ],
+    [
+     "Blitzcrank, Impassive",
+     2
+    ],
+    [
+     "Block",
+     1
+    ],
+    [
+     "Defy",
+     3
+    ],
+    [
+     "Discipline",
+     3
+    ],
+    [
+     "Falling Star",
+     3
+    ],
+    [
+     "Kai'Sa, Survivor",
+     3
+    ],
+    [
+     "Long Sword",
+     3
+    ],
+    [
+     "Mischievous Marai",
+     1
+    ],
+    [
+     "Mournful Witness",
+     3
+    ],
+    [
+     "Not So Fast",
+     1
+    ],
+    [
+     "Noxus Hopeful",
+     1
+    ],
+    [
+     "Shuriken Flip",
+     3
+    ],
+    [
+     "Stellacorn Herder",
+     3
+    ],
+    [
+     "Tomb-Raider Barbara",
+     1
+    ],
+    [
+     "Zhonya's Hourglass",
+     3
+    ]
+   ]
+  },
+  {
+   "weight": 2,
+   "era": "Radiance",
+   "name": "Kennen – Heart of the Tempest · LDXP Sacramento Riftbound Showdown (Dylan Sumner) – Radiance, 755 Spieler",
+   "legend": "Heart of the Tempest",
+   "event": "LDXP Sacramento Riftbound Showdown (Dylan Sumner) – Radiance, 755 Spieler",
+   "placement": "6.",
+   "date": "2026-10-26",
+   "source": "runesandrift.com",
+   "cards": [
+    [
+     "Kennen, Storm of Shuriken",
+     1
+    ],
+    [
+     "An Offer You Can't Refuse",
+     1
+    ],
+    [
+     "Carrion Dredger",
+     1
+    ],
+    [
+     "Edge of Night",
+     1
+    ],
+    [
+     "Fizz, Trickster",
+     1
+    ],
+    [
+     "Flash",
+     1
+    ],
+    [
+     "Gust",
+     2
+    ],
+    [
+     "Hard Bargain",
+     1
+    ],
+    [
+     "Last Rites",
+     2
+    ],
+    [
+     "Lightning Rush",
+     3
+    ],
+    [
+     "Nocturne, Horrifying",
+     3
+    ],
+    [
+     "Reckless Innovator",
+     3
+    ],
+    [
+     "Rhasa the Sunderer",
+     3
+    ],
+    [
+     "Ride the Wind",
+     3
+    ],
+    [
+     "Seal of Discord",
+     3
+    ],
+    [
+     "Shadow Order Disciple",
+     1
+    ],
+    [
+     "Star-Crossed",
+     1
+    ],
+    [
+     "Switcheroo",
+     2
+    ],
+    [
+     "Tideturner",
+     1
+    ],
+    [
+     "Traveling Merchant",
+     3
+    ],
+    [
+     "Trifarian Captain",
+     3
+    ]
+   ]
+  },
+  {
+   "weight": 2,
+   "era": "Radiance",
+   "name": "Rengar – Pridestalker · LDXP Sacramento Riftbound Showdown (Daniel Vu) – Radiance, 755 Spieler",
+   "legend": "Pridestalker",
+   "event": "LDXP Sacramento Riftbound Showdown (Daniel Vu) – Radiance, 755 Spieler",
+   "placement": "8.",
+   "date": "2026-10-26",
+   "source": "runesandrift.com",
+   "cards": [
+    [
+     "Rengar, Trophy Hunter",
+     1
+    ],
+    [
+     "Elnuk Herd",
+     2
+    ],
+    [
+     "Ferrous Forerunner",
+     1
+    ],
+    [
+     "First Mate",
+     2
+    ],
+    [
+     "Grim Apothecary",
+     2
+    ],
+    [
+     "Inferna",
+     3
+    ],
+    [
+     "Irresistible Faefolk",
+     3
+    ],
+    [
+     "Kai'Sa, Survivor",
+     3
+    ],
+    [
+     "Kinkou Initiate",
+     3
+    ],
+    [
+     "Nidalee, Cat Form",
+     2
+    ],
+    [
+     "Noxus Hopeful",
+     3
+    ],
+    [
+     "Pit Rookie",
+     3
+    ],
+    [
+     "Punch First",
+     3
+    ],
+    [
+     "Pyke, Dockside Butcher",
+     2
+    ],
+    [
+     "Rampage",
+     2
+    ],
+    [
+     "Sabotage",
+     2
+    ],
+    [
+     "Thrill of the Hunt",
+     3
     ]
    ]
   },

@@ -24,6 +24,16 @@ decks = [
  dict(legend='Blade Dancer', champion='Irelia', event='Regional Qualifier Los Angeles (Xeno) – nach dem Bann', placement='2.', date='2026-09-27', source='riftbound.gg / riftwatch.gg', weight=2,
    cards='1 Irelia, Fervent; 1 Abandon; 1 Akali, Silent; 2 Boots of Swiftness; 2 Charm; 3 Defiant Dance; 3 Defy; 3 Discipline; 2 En Garde; 1 Flash; 1 Guardian Angel; 1 Gust; 1 Not So Fast; 1 Pyke, Returned; 2 Ride the Wind; 3 Scuttle Crab; 2 Star-Crossed; 3 Stellacorn Herder; 3 Tideturner; 1 Twilight Shroud; 1 Vex, Apathetic; 2 Zhonya\'s Hourglass'),
  # --- Radiance (seit 23.10.2026): era='Radiance', zählen voll ---
+ dict(legend='The Exile', champion='Riven', event='LDXP Sacramento Riftbound Showdown (Nam Dang) – Radiance, 755 Spieler', placement='1.', date='2026-10-26', source='runesandrift.com', weight=2, era='Radiance',
+   cards="1 Riven, Broken Blade; 3 Astral Heron; 2 Battle Preparations; 2 Bedeviling Stranger; 3 Blade of the Exile; 2 Blitzcrank, Impassive; 3 Defy; 3 Discipline; 2 Gust; 1 Not So Fast; 1 Rebuke; 2 Reckless Innovator; 3 Scuttle Crab; 1 Star-Crossed; 3 Stellacorn Herder; 2 Switcheroo; 3 Tideturner; 3 Zhonya's Hourglass"),
+ dict(legend='Herald of the Arcane', champion='Viktor', event='LDXP Sacramento Riftbound Showdown (Calvin Jin) – Radiance, 755 Spieler', placement='2.', date='2026-10-26', source='runesandrift.com', weight=2, era='Radiance',
+   cards="1 Viktor, Leader; 1 B.F. Sword; 3 Bellows Breath; 1 Blood Money; 3 Carrion Dredger; 3 Concert Poster; 3 Cull the Weak; 1 Facebreaker; 3 Hidden Blade; 3 Imperial Decree; 1 Kennen, Keeper of Balance; 1 Salvage; 3 Shadow's Call; 3 Sprite Burst; 3 Sprite Fountain; 3 Stupefy; 1 Thousand-Tailed Watcher; 3 Wages of Pain"),
+ dict(legend='Rogue Assassin', champion='Akali', event='LDXP Sacramento Riftbound Showdown (Alex Gorica) – Radiance, 755 Spieler', placement='3.', date='2026-10-26', source='runesandrift.com', weight=2, era='Radiance',
+   cards="1 Akali, Deadly Weapon; 3 Astral Heron; 2 Back Off; 2 Blitzcrank, Impassive; 1 Block; 3 Defy; 3 Discipline; 3 Falling Star; 3 Kai'Sa, Survivor; 3 Long Sword; 1 Mischievous Marai; 3 Mournful Witness; 1 Not So Fast; 1 Noxus Hopeful; 3 Shuriken Flip; 3 Stellacorn Herder; 1 Tomb-Raider Barbara; 3 Zhonya's Hourglass"),
+ dict(legend='Heart of the Tempest', champion='Kennen', event='LDXP Sacramento Riftbound Showdown (Dylan Sumner) – Radiance, 755 Spieler', placement='6.', date='2026-10-26', source='runesandrift.com', weight=2, era='Radiance',
+   cards="1 Kennen, Storm of Shuriken; 1 An Offer You Can't Refuse; 1 Carrion Dredger; 1 Edge of Night; 1 Fizz, Trickster; 1 Flash; 2 Gust; 1 Hard Bargain; 2 Last Rites; 3 Lightning Rush; 3 Nocturne, Horrifying; 3 Reckless Innovator; 3 Rhasa the Sunderer; 3 Ride the Wind; 3 Seal of Discord; 1 Shadow Order Disciple; 1 Star-Crossed; 2 Switcheroo; 1 Tideturner; 3 Traveling Merchant; 3 Trifarian Captain"),
+ dict(legend='Pridestalker', champion='Rengar', event='LDXP Sacramento Riftbound Showdown (Daniel Vu) – Radiance, 755 Spieler', placement='8.', date='2026-10-26', source='runesandrift.com', weight=2, era='Radiance',
+   cards="1 Rengar, Trophy Hunter; 2 Elnuk Herd; 1 Ferrous Forerunner; 2 First Mate; 2 Grim Apothecary; 3 Inferna; 3 Irresistible Faefolk; 3 Kai'Sa, Survivor; 3 Kinkou Initiate; 2 Nidalee, Cat Form; 3 Noxus Hopeful; 3 Pit Rookie; 3 Punch First; 2 Pyke, Dockside Butcher; 2 Rampage; 2 Sabotage; 3 Thrill of the Hunt"),
  dict(legend='Heart of the Tempest', champion='Kennen', event='Runes & Rift Open #25 (Simple) – Radiance, 22 Spieler', placement='1.', date='2026-10-18', source='runesandrift.com', weight=1.2, era='Radiance',
    cards="1 Kennen, Storm of Shuriken; 3 Traveling Merchant; 3 Rhasa the Sunderer; 3 Seal of Discord; 3 Tail-Cloaked Matriarch; 3 Lightning Rush; 3 Trifarian Captain; 2 Gust; 2 Ride the Wind; 2 Last Rites; 2 Tornado Warrior; 2 Bedeviling Stranger; 1 Flash; 1 Switcheroo; 1 Star-Crossed; 1 Shadows of the Past; 1 An Offer You Can't Refuse; 3 Nocturne, Horrifying; 2 Fizz, Trickster; 1 Ezreal, Prodigy"),
  dict(legend='Daughter of the Void', champion="Kai'Sa", event='Runes & Rift Open #25 (Art3mis) – Radiance, 22 Spieler', placement='2.', date='2026-10-18', source='runesandrift.com', weight=1.2, era='Radiance',
@@ -118,15 +128,18 @@ print('\n'.join(report))
 # Ergebnissen im Radiance-Day-1-Bericht; die Vendetta-Tier-1 ohne Radiance-Belege
 # stehen in Tier 2, bis neue Ergebnisse vorliegen.
 TIERS = {
-  'The Exile': 1, 'Heart of the Tempest': 1, 'Daughter of the Void': 1,
-  'Rogue Assassin': 2, 'Blade Dancer': 2, 'Wuju Bladesman, Starter': 2, 'Pridestalker': 2, 'Deceiver': 2, 'Emperor of the Sands': 2,
-  'Gloomist': 3, 'Defender of Tomorrow': 3, 'Void Burrower': 3, 'Grand Duelist': 3,
-  'Voidreaver': 3, 'Fire Below the Mountain': 3, 'Scorn of the Moon': 3, 'Purifier': 3, 'Prodigal Explorer': 3,
+  # riftbound.zone Radiance-Tierliste (Stand 01.11.2026): S → 1, A → 2, B → 3
+  'The Exile': 1, 'Daughter of the Void': 1, 'Heart of the Tempest': 1,
+  'Blade Dancer': 2, 'Defender of Tomorrow': 2, 'Pridestalker': 2, 'Lady of Clockwork': 2, 'Void Burrower': 2, 'Gloomist': 2,
+  'Rogue Assassin': 2, "Agony's Embrace": 2, 'Herald of the Arcane': 2, 'Wuju Bladesman, Starter': 2, 'Emperor of the Sands': 2,
+  'Deceiver': 2, 'Iron Revenant': 2, 'Prodigal Explorer': 2,
+  'Scorn of the Moon': 3, 'Voidreaver': 3, 'Fire Below the Mountain': 3, 'Curator of the Sands': 3, 'Bloodharbor Ripper': 3,
+  'Purifier': 3, 'Grand Duelist': 3, 'Glorious Executioner': 3, 'Bashful Bloom': 3,
 }
 for k in TIERS: assert k.lower() in legends, k
 json.dump(dict(
-  updated='2026-10-26',
-  tiers=dict(source='vorläufig: riftbound.gg Radiance-Day-1-Bericht (22.10.) + Vendetta-Tierliste (09.10.)', date='2026-10-22',
+  updated='2026-11-02',
+  tiers=dict(source='riftbound.zone Radiance-Tierliste (S/A/B)', date='2026-11-01',
              legends={legends[k.lower()]['fullName']: t for k, t in TIERS.items()}),
-  note='Kernlisten aus Top-8- und Best-Of-Decks der Regional Qualifiers der Vendetta-Saison (Utrecht, Barcelona, Singapur, Sydney, Hartford, Vancouver, Atlanta, Los Angeles) und Turniere nach dem Bann vom 18.09. (RQ Los Angeles: Rengar, Irelia, Azir; Kennen: Convergence #3). Aus öffentlich einsehbaren Turnierberichten übernommen und gegen die offizielle Kartendatenbank, die Domain-Identität der Legende und die Bannliste vom 18.09.2026 geprüft. Listen nach dem Bann zählen doppelt. Teils unvollständig; Sideboards nicht enthalten. Seit Radiance (23.10.) zählen diese Vendetta-Listen nur noch ein Viertel – wo es genug Radiance-Decks gibt, ist die Community-Kernliste das Vorbild. Erste Radiance-Turnierlisten: Runes & Rift Open #25 (18.10., 22 Spieler, Rift Atlas).',
+  note='Kernlisten aus Top-8- und Best-Of-Decks der Regional Qualifiers der Vendetta-Saison (Utrecht, Barcelona, Singapur, Sydney, Hartford, Vancouver, Atlanta, Los Angeles) und Turniere nach dem Bann vom 18.09. (RQ Los Angeles: Rengar, Irelia, Azir; Kennen: Convergence #3). Aus öffentlich einsehbaren Turnierberichten übernommen und gegen die offizielle Kartendatenbank, die Domain-Identität der Legende und die Bannliste vom 18.09.2026 geprüft. Listen nach dem Bann zählen doppelt. Teils unvollständig; Sideboards nicht enthalten. Seit Radiance (23.10.) zählen diese Vendetta-Listen nur noch ein Viertel – wo es genug Radiance-Decks gibt, ist die Community-Kernliste das Vorbild. Radiance-Turnierlisten: LDXP Sacramento Showdown (26.10., 755 Spieler) und Runes & Rift Open #25 (18.10., 22 Spieler).',
   decks=out), open(os.path.join(ROOT, 'data/meta.json'),'w'), ensure_ascii=False, indent=1)
