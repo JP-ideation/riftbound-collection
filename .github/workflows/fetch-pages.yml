@@ -1,0 +1,37 @@
+# Temporär: Seiten für die Meta-Recherche abrufen und als Text ablegen
+name: Seiten abrufen (Recherche)
+on:
+  push:
+    branches: ['claude/**']
+    paths: ['scripts/research-urls.txt']
+permissions:
+  contents: write
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Seiten laden
+        run: |
+          rm -rf research; mkdir -p research; i=0
+          while read -r url; do
+            [ -z "$url" ] && continue; i=$((i+1))
+            curl -sSL --max-time 40 -A 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/124 Safari/537.36' "$url" -o "/tmp/$i.html" || true
+            python3 - "$url" "/tmp/$i.html" "research/$i.txt" <<'PY'
+          import sys, re, html
+          url, src, dst = sys.argv[1:]
+          t = open(src, encoding='utf-8', errors='replace').read()
+          t = re.sub(r'(?is)<(script|style|noscript|svg)[^>]*>.*?</\1>', ' ', t)
+          t = re.sub(r'(?i)<br\s*/?>|</(p|div|li|tr|h\d|section|article|td|th)>', '\n', t)
+          t = re.sub(r'(?i)<img[^>]*alt="([^"]*)"[^>]*>', r' [\1] ', t)
+          t = re.sub(r'<[^>]+>', ' ', t); t = html.unescape(t)
+          t = re.sub(r'[ \t\r\f\v]+', ' ', t); t = re.sub(r'\n\s*\n+', '\n', t)
+          open(dst, 'w').write(url + '\n' + t.strip()[:400000])
+          PY
+            echo "$i $url $(wc -c < research/$i.txt)" >> research/index.txt
+          done < scripts/research-urls.txt
+      - name: Committen
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git add research && git commit -m "Recherche: Seiten abgerufen" && git pull --rebase origin ${GITHUB_REF_NAME} && git push origin HEAD:${GITHUB_REF_NAME}
