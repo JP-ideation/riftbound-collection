@@ -24,6 +24,16 @@ decks = [
  dict(legend='Blade Dancer', champion='Irelia', event='Regional Qualifier Los Angeles (Xeno) – nach dem Bann', placement='2.', date='2026-09-27', source='riftbound.gg / riftwatch.gg', weight=2,
    cards='1 Irelia, Fervent; 1 Abandon; 1 Akali, Silent; 2 Boots of Swiftness; 2 Charm; 3 Defiant Dance; 3 Defy; 3 Discipline; 2 En Garde; 1 Flash; 1 Guardian Angel; 1 Gust; 1 Not So Fast; 1 Pyke, Returned; 2 Ride the Wind; 3 Scuttle Crab; 2 Star-Crossed; 3 Stellacorn Herder; 3 Tideturner; 1 Twilight Shroud; 1 Vex, Apathetic; 2 Zhonya\'s Hourglass'),
  # --- Radiance (seit 23.10.2026): era='Radiance', zählen voll ---
+ dict(legend='The Exile', champion="Riven", event='Regional Championship Europe, Stuttgart (DiamondHat) – Radiance, 315 Spieler', placement='3.', date='2026-11-08', source='runesandrift.com', weight=2.5, era='Radiance',
+   cards='1 Riven, Broken Blade; 1 Teemo, Scout; 2 Tideturner; 3 Bedeviling Stranger; 2 Scuttle Crab; 3 Reckless Innovator; 2 Blitzcrank, Impassive; 3 Astral Heron; 1 Baron Nashor; 2 Defy; 1 En Garde; 2 Gust; 3 Discipline; 2 Rebuke; 1 Not So Fast; 2 Switcheroo; 3 Zhonya\'s Hourglass; 3 The Good Stuff; 3 Blade of the Exile'),
+ dict(legend='The Exile', champion="Riven", event='Regional Championship Europe, Stuttgart (BQO Caravaggio) – Radiance, 315 Spieler', placement='4.', date='2026-11-08', source='runesandrift.com', weight=2.5, era='Radiance',
+   cards='1 Riven, Broken Blade; 3 Discipline; 3 Tideturner; 3 Stellacorn Herder; 3 Astral Heron; 3 Bedeviling Stranger; 3 Blade of the Exile; 2 Defy; 2 Zhonya\'s Hourglass; 2 Gust; 2 Switcheroo; 2 Battle Preparations; 2 Reckless Innovator; 1 Charm; 1 Rebuke; 1 Traveling Merchant; 1 Not So Fast; 1 Scuttle Crab; 1 Star-Crossed; 1 Baron Nashor; 2 Blitzcrank, Impassive'),
+ dict(legend='The Exile', champion="Riven", event='Regional Championship Europe, Stuttgart (lets see lol) – Radiance, 315 Spieler; Champion in der Quelle nicht angegeben – Riven, Broken Blade angenommen', placement='6.', date='2026-11-08', source='runesandrift.com', weight=2.5, era='Radiance',
+   cards='1 Riven, Broken Blade; 3 Discipline; 3 Tideturner; 3 Stellacorn Herder; 3 Astral Heron; 3 Bedeviling Stranger; 3 Blade of the Exile; 2 Defy; 2 Zhonya\'s Hourglass; 2 Gust; 2 Switcheroo; 2 Battle Preparations; 2 Reckless Innovator; 1 Charm; 1 Rebuke; 1 Traveling Merchant; 1 Not So Fast; 1 Scuttle Crab; 1 Star-Crossed; 1 Baron Nashor; 2 Blitzcrank, Impassive'),
+ dict(legend='Heart of the Tempest', champion="Kennen", event='Regional Championship Europe, Stuttgart (HXN Gonkra) – Radiance, 315 Spieler', placement='7.', date='2026-11-08', source='runesandrift.com', weight=2.5, era='Radiance',
+   cards='1 Kennen, Storm of Shuriken; 3 Traveling Merchant; 1 Tideturner; 2 Bedeviling Stranger; 3 Trifarian Captain; 2 Reckless Innovator; 2 Fizz, Trickster; 3 Nocturne, Horrifying; 3 Rhasa the Sunderer; 2 Gust; 3 Lightning Rush; 2 Ride the Wind; 1 Hard Bargain; 2 Switcheroo; 2 Star-Crossed; 3 Seal of Discord; 1 Burn Away; 2 Edge of Night; 2 Last Rites'),
+ dict(legend='Heart of the Tempest', champion="Kennen", event='Regional Championship Europe, Stuttgart (On Curve Willy) – Radiance, 315 Spieler', placement='8.', date='2026-11-08', source='runesandrift.com', weight=2.5, era='Radiance',
+   cards='1 Kennen, Storm of Shuriken; 3 Traveling Merchant; 1 Tideturner; 2 Bedeviling Stranger; 3 Trifarian Captain; 2 Fizz, Trickster; 2 Tornado Warrior; 3 Nocturne, Horrifying; 3 Tail-Cloaked Matriarch; 3 Rhasa the Sunderer; 3 Gust; 3 Lightning Rush; 2 Ride the Wind; 1 Switcheroo; 2 Star-Crossed; 3 Seal of Discord; 1 An Offer You Can\'t Refuse; 2 Last Rites'),
  dict(legend='Heart of the Tempest', champion="Kennen", event='Regional Championship Europe, Stuttgart (ASC Evansrhim) – Radiance, 315 Spieler', placement='1.', date='2026-11-08', source='runesandrift.com', weight=2.5, era='Radiance',
    cards='1 Kennen, Storm of Shuriken; 3 Traveling Merchant; 3 Rhasa the Sunderer; 3 Seal of Discord; 3 Lightning Rush; 3 Trifarian Captain; 2 Gust; 2 Edge of Night; 2 Switcheroo; 2 Last Rites; 2 Star-Crossed; 2 Reckless Innovator; 2 Bedeviling Stranger; 1 Rebuke; 1 Ride the Wind; 1 Tideturner; 1 Hidden Blade; 1 Hard Bargain; 1 An Offer You Can\'t Refuse; 3 Nocturne, Horrifying; 1 Fizz, Trickster'),
  dict(legend='The Exile', champion="Riven", event='Regional Championship Europe, Stuttgart (Sonecon) – Radiance, 315 Spieler', placement='2.', date='2026-11-08', source='runesandrift.com', weight=2.5, era='Radiance',
@@ -116,6 +126,18 @@ decks = [
    cards="1 Kai'Sa, Survivor; 3 Ravenbloom Student; 3 Hextech Ray; 2 Watchful Sentry; 2 Cleave; 2 Retreat; 2 Stupefy; 2 Falling Star; 2 Pouty Poro; 1 Darius, Trifarian; 2 Thousand-Tailed Watcher; 2 Smoke Screen; 2 Void Seeker"),
 ]
 legends = {c['fullName'].lower(): c for c in DB if c['type']=='legend'}
+# Turnier, zu dem eine Liste gehört – für die Turnier-Reiter im Decks-Tab
+GROUPS = [
+  ('Regional Championship Europe', 'Regional Championship Europe – Stuttgart 2026'),
+  ('Showdown Orlando', 'Riftbound Showdown Orlando 2026'),
+  ('LDXP Sacramento', 'Riftbound Showdown Sacramento 2026'),
+  ('Runes & Rift Open #25', 'Runes & Rift Open #25'),
+  ('Regional Qualifier Los Angeles', 'Regional Qualifier Los Angeles 2026'),
+]
+def group_of(event):
+    for key, name in GROUPS:
+        if key in event: return name
+    return None
 out, report = [], []
 for d in decks:
     L = legends.get(d['legend'].lower())
@@ -135,7 +157,7 @@ for d in decks:
     # Radiance-Community-Decks gibt, sind die das Vorbild (Gewicht 0,6).
     era = d.get('era', 'Vendetta')
     w = d.get('weight', 1) * (0.25 if era == 'Vendetta' else 1)
-    out.append(dict(weight=w, era=era, name=f"{d['champion']} – {L['name']} · {d['event']}", legend=L['fullName'], event=d['event'], placement=d['placement'], date=d['date'], source=d['source'], cards=cards))
+    out.append(dict(weight=w, era=era, group=d.get('group') or group_of(d['event']), name=f"{d['champion']} – {L['name']} · {d['event']}", legend=L['fullName'], event=d['event'], placement=d['placement'], date=d['date'], source=d['source'], cards=cards))
     report.append(f"{d['champion']:10} {len(cards):2} Karten ({sum(x[1] for x in cards):2} Ex.) | entfernt: {', '.join(dropped) or '-'}")
 print('\n'.join(report))
 # Vorläufig für Radiance (Set seit 23.10.): Tier 1 = die Legenden mit den besten

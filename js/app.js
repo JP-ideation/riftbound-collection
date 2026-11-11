@@ -48,7 +48,7 @@ function applyCollection(text, persist = true) {
   const { owned, unmatched } = buildInventory(state.db, entries);
   state.inv = { owned };
   state.unmatched = unmatched;
-  state.decks = state.imported = state.lists = null;                       // wird beim Öffnen des Deck-Tabs berechnet
+  state.decks = state.imported = state.lists = state.events = null;                       // wird beim Öffnen des Deck-Tabs berechnet
   state.parseErrors = errors;
   if (persist) store(KEY.coll, text);
   renderHead();
@@ -108,7 +108,30 @@ function listDecks() {
   }).filter(Boolean);
   return state.lists;
 }
-const listById = id => listDecks().find(d => d.listDeck.id === id);
+/**
+ * Turnierlisten nach Turnier gruppiert (Feld „group“ in data/meta.json) – auch
+ * für Legenden, die du nicht besitzt. Grundlage der Turnier-Reiter im Decks-Tab.
+ */
+function eventDecks() {
+  if (state.events) return state.events;
+  const meta = metaDecks();
+  state.events = tournamentMeta().filter(m => m.builtin?.group).map(m => {
+    const legend = state.db.byName.get(m.legendKey);
+    const main = [...m.cards].map(([k, count]) => ({ card: state.db.byName.get(k), count })).filter(x => x.card);
+    try {
+      const d = evaluateList(state.inv, legend, { name: m.name, main }, state.db.cards, state.community, meta);
+      const b = m.builtin;
+      d.listDeck = { id: listId(m.name), name: m.name, missing: d.imported.missing, kind: 'Turnierliste',
+        info: `${b.placement} · ${b.date} · ${b.source}`, group: b.group, placement: parseInt(b.placement) || 99,
+        player: /\(([^)]+)\)/.exec(b.event)?.[1] ?? '', date: b.date, players: +(/(\d+) Spieler/.exec(b.event)?.[1] ?? 0),
+        legendOwned: state.inv.owned.has(m.legendKey) };
+      delete d.imported;
+      return d;
+    } catch (err) { console.warn('Turnierliste nicht auswertbar:', m.name, err); return null; }
+  }).filter(Boolean);
+  return state.events;
+}
+const listById = id => listDecks().find(d => d.listDeck.id === id) ?? eventDecks().find(d => d.listDeck.id === id);
 /** Nachbau einer Liste mit deiner Sammlung (bei automatisch gebauten Decks: das Deck selbst). */
 const buildCache = new WeakMap();
 function buildOf(d) {
@@ -118,7 +141,7 @@ function buildOf(d) {
 }
 /** Das gerade offene Deck (Decks-Tab oder eine Liste aus dem Meta-Tab). */
 function detailDeck() {
-  if (state.view === 'meta' && state.openList) return listById(state.openList) ?? null;
+  if ((state.view === 'meta' || state.view === 'decks') && state.openList) return listById(state.openList) ?? null;
   if (state.view === 'decks' && state.deckIdx != null) return decks()[state.deckIdx] ?? null;
   return null;
 }
@@ -417,8 +440,52 @@ const tierBadge = d => (tierOf(d) ? `<span class="badge tier t${tierOf(d)}" titl
 const diffBadge = d => `<span class="badge ${DIFF_CLS[d.difficulty.level]}" title="Schwierigkeit ${num(d.difficulty.score)}/10">${esc(d.difficulty.label)}</span>`;
 const num = x => (Math.round(x * 10) / 10).toString().replace('.', ',');
 
+/** Aufklappbarer Abschnitt – hält lange Seiten übersichtlich. */
+const fold = (title, html, open = false) => (html && html.trim()
+  ? `<details class="fold"${open ? ' open' : ''}><summary>${title}</summary><div class="fold-body">${html}</div></details>` : '');
+
+/** Umschalter oben im Decks-Tab: deine Decks oder die Top-Decks der Turniere. */
+const deckModeBar = () => `<div class="seg" style="margin-bottom:14px">
+  <button class="btn sm ${state.deckMode !== 'events' ? 'primary' : ''}" data-deckmode="mine">Deine Decks</button>
+  <button class="btn sm ${state.deckMode === 'events' ? 'primary' : ''}" data-deckmode="events">🏆 Turniere</button></div>`;
+
+/** Turnier-Reiter: Top-Decks eines Turniers nach Platz, jedes zum Öffnen wie ein Deck. */
+function viewEvents() {
+  const all = eventDecks();
+  const newest = g => all.filter(d => d.listDeck.group === g).reduce((m, d) => (d.listDeck.date > m ? d.listDeck.date : m), '');
+  const groups = [...new Set(all.map(d => d.listDeck.group))].sort((a, b) => newest(b).localeCompare(newest(a)));
+  if (!groups.length) return `${deckModeBar()}<div class="empty">Noch keine Turnierlisten.</div>`;
+  const g = groups.includes(state.eventGroup) ? state.eventGroup : groups[0];
+  const ds = all.filter(d => d.listDeck.group === g).sort((a, b) => a.listDeck.placement - b.listDeck.placement);
+  const players = Math.max(...ds.map(d => d.listDeck.players));
+  const count = {};
+  for (const d of ds) count[d.champion ?? d.legend.name] = (count[d.champion ?? d.legend.name] ?? 0) + 1;
+  return `${deckModeBar()}
+    <div class="seg scroll" style="margin-bottom:12px">${groups.map(x =>
+      `<button class="btn sm ${x === g ? 'primary' : ''}" data-eventgroup="${esc(x)}">${esc(x)}</button>`).join('')}</div>
+    <h2>${esc(g)}</h2>
+    <p class="sub">${players ? `${players} Spieler · ` : ''}${new Date(newest(g)).toLocaleDateString('de-DE')} ·
+      ${Object.entries(count).sort((a, b) => b[1] - a[1]).map(([k, n]) => `${esc(k)} ${n}×`).join(', ')}.
+      Tippe ein Deck an: Liste, was dir fehlt, Nachbau mit deinen Karten und Kopieren für TCG Arena.</p>
+    <div class="decklist">${ds.map(d => `
+      <button class="deckcard" data-openlist="${esc(d.listDeck.id)}">
+        <div class="row" style="justify-content:space-between;align-items:flex-start">
+          <div><div class="t">${d.listDeck.placement}. ${esc(d.champion ?? d.legend.name)}</div>
+            <div class="m">${esc(d.legend.name)} · ${esc(d.listDeck.player)}<br>${dots(d.identity)} ${d.identity.join(' + ')}</div></div>
+          <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end">
+            ${tierBadge(d)}
+            <span class="badge ${d.metaRef.owned >= 0.9 ? 'ok' : d.metaRef.owned >= 0.6 ? 'warn' : 'bad'}">du besitzt ${pct(d.metaRef.owned, 1)}%</span>
+            ${d.listDeck.legendOwned ? '' : '<span class="badge bad">Legende fehlt dir</span>'}
+          </div>
+        </div>
+      </button>`).join('')}</div>`;
+}
+
 function viewDecks() {
   const list = decks();
+  const openL = state.openList && listById(state.openList);
+  if (openL) return viewDeckDetail(openL);
+  if (state.deckMode === 'events') return viewEvents();
   if (state.deckIdx != null && list[state.deckIdx]) return viewDeckDetail(list[state.deckIdx]);
   if (!list.length) return `<h2>Decks</h2><div class="empty">Keine Legende in der Sammlung – ohne Legende lässt sich kein Deck bauen.</div>`;
 
@@ -432,6 +499,7 @@ function viewDecks() {
   const opts = (items, cur) => items.map(([k, l]) => `<option value="${k}" ${k === cur ? 'selected' : ''}>${l}</option>`).join('');
 
   return `
+    ${deckModeBar()}
     <h2>Deine besten Decks</h2>
     <p class="sub"><b>Ausschließlich aus Karten, die du besitzt</b> – nichts muss nachgekauft werden. Turnierlisten dienen als
        Vorbild; fehlt dir eine Turnierkarte, nimmt das Deck eine eigene Karte mit ähnlicher Rolle.</p>
@@ -446,13 +514,14 @@ function viewDecks() {
         <input type="checkbox" id="deckBeginner" style="width:auto;flex:none;margin-top:2px" ${v.beginner ? 'checked' : ''}>
         Ich bin Einsteiger – leichte Decks bei „Bewertung" etwas weiter nach vorn
       </label>
-      <p class="sub" style="margin:10px 0 0;font-size:12px"><b>Bewertung</b> = Stärke der Karten im Zusammenspiel (Motor der Legende,
+      <details style="margin-top:10px"><summary class="sub" style="cursor:pointer;margin:0;font-size:12px">Wie bewertet die App? (antippen)</summary>
+      <p class="sub" style="margin:6px 0 0;font-size:12px"><b>Bewertung</b> = Stärke der Karten im Zusammenspiel (Motor der Legende,
         erfüllte Bedingungen, Kurve) + Bonus für den umgesetzten Teil der Turnierliste. <b>Schwierigkeit</b> = wie viel das
         Deck vom Spieler verlangt (Timing, Bedingungen, Legenden-Motor) – sie fließt nicht in die Bewertung ein. <b>Turnierliste %</b> = wie viel
         der Profi-Liste dein Deck enthält. <b>Besitz %</b> = wie viel der Profi-Liste du überhaupt hast. <b>Community %</b> = wie typisch deine Karten für die
         beliebtesten Community-Decks dieser Legende sind (Piltover Archive; 100 % = jede Karte steckt in allen diesen Decks).
         Regeln: 40 Karten, 12 Runen, 3 Schlachtfelder, max. 3 Kopien ([Unique] 1), Champion Pflicht, max. 3 Signature,
-        Bannliste Stand ${new Date(BANNED_AS_OF).toLocaleDateString('de-DE')}.</p>
+        Bannliste Stand ${new Date(BANNED_AS_OF).toLocaleDateString('de-DE')}.</p></details>
     </div>
     ${state.importSkipped?.length ? `<div class="notice" style="margin-bottom:12px"><b>${state.importSkipped.length} eigene Liste(n) nicht in der Deckliste:</b>
       ${state.importSkipped.map(x => `„${esc(x.m.name)}“ (${esc(x.why)})`).join(', ')}. Im Tab „Meta-Decks“ die Legende auswählen, dann erscheint sie hier.</div>` : ''}
@@ -501,14 +570,14 @@ function viewDeckDetail(d) {
         <button class="btn sm" data-pinlist="${esc(M.listDeck.id)}" data-status="spiele">📌 Spiele ich (diese Fassung)</button>`
         : `<button class="btn sm" data-pinimp="${esc(M.imported.id)}" data-status="baue">🔧 Baue ich (diese Fassung)</button>`}</div>`}`;
   return `
-    <div class="row" style="margin-bottom:14px">${d.listDeck ? '<button class="btn sm" id="backMeta">← Meta-Decks</button>'
+    <div class="row" style="margin-bottom:14px">${d.listDeck ? `<button class="btn sm" id="backMeta">${state.view === 'decks' ? '← Turnier' : '← Meta-Decks'}</button>`
       : '<button class="btn sm" id="backDecks">← Alle Decks</button>'}</div>
-    <h2>${esc(L ? L.name : deckTitle(d))} <span class="badge ${d.complete ? 'ok' : 'warn'}">${d.complete ? 'komplett spielbar' : L ? `dir fehlen ${L.missing} Karten` : 'unvollständig'}</span></h2>
+    <h2>${esc(d.listDeck?.group ? `${d.listDeck.placement}. ${deckTitle(d)}` : L ? L.name : deckTitle(d))} <span class="badge ${d.complete ? 'ok' : 'warn'}">${d.complete ? 'komplett spielbar' : L ? `dir fehlen ${L.missing} Karten` : 'unvollständig'}</span></h2>
     ${d.imported ? `<div class="row" style="margin:-4px 0 10px;gap:8px"><span class="badge imp">importiert</span>
       <button class="btn sm" data-renmeta="${esc(d.imported.id)}">✏️ Namen ändern</button>
       <span class="sub" style="margin:0">${esc(deckTitle(d))}</span></div>`
       : d.listDeck ? `<div class="row" style="margin:-4px 0 10px;gap:8px"><span class="badge">${esc(d.listDeck.kind)}</span>
-      <span class="sub" style="margin:0">${esc(deckTitle(d))} · ${esc(d.listDeck.info)}</span></div>` : ''}
+      <span class="sub" style="margin:0">${d.listDeck.group ? `${esc(d.listDeck.group)} · ${esc(d.listDeck.player)}` : `${esc(deckTitle(d))} · ${esc(d.listDeck.info)}`}</span></div>` : ''}
     <p class="sub">${dots(d.identity)} ${d.identity.join(' + ')} · Bewertung ${(Math.round(d.rating * 10) / 10).toString().replace('.', ',')} (Stärke ${String(d.score).replace('.', ',')}) · Ø ${d.avgEnergy} Energie · ${d.imported ? 'deine hochgeladene Liste, unverändert' : d.listDeck ? 'die Liste, unverändert' : 'nur Karten aus deinem Bestand'}
       ${d.complete || L ? '' : ` · es fehlen ${d.missingSlots.main} Hauptdeck-, ${d.missingSlots.runes} Runen- und ${d.missingSlots.battlefields} Schlachtfeldkarten`}
       ${L && d.counts.main !== 40 ? ` · <b>die Liste hat ${d.counts.main} statt 40 Hauptdeck-Karten</b>` : ''}
@@ -526,9 +595,9 @@ function viewDeckDetail(d) {
     ${d.metaRef || L ? '' : `<div class="notice" style="margin-bottom:16px"><b>Ohne Turnierliste gebaut.</b> Für diese Legende liegt keine
       Profi-Liste vor – das Deck folgt nur den Kartentexten (Regeln, Motor, Bedingungen). Spielbar, aber nicht turniererprobt.
       Mit einer eingefügten Turnierliste (Tab „Meta-Decks“) wählt die App aus deinen Karten gezielter aus.</div>`}
-    ${difficultyBlock(d)}
-    ${guideBlock(d)}
-    ${deckKeywords(d)}
+    ${fold(`Schwierigkeit · ${esc(d.difficulty.label)}`, difficultyBlock(d))}
+    ${fold('So spielst du das Deck', guideBlock(d))}
+    ${fold('Schlüsselwörter im Deck', deckKeywords(d))}
 
     <div class="cols">
       <div>
@@ -546,7 +615,7 @@ function viewDeckDetail(d) {
         <h3>Schlachtfelder · ${d.counts.battlefields}/3</h3>
         ${d.battlefields[0]?.auto ? '<p class="sub" style="margin:0 0 6px">Nicht in der Liste – aus deinem Bestand ergänzt.</p>' : ''}
         <div class="lines">${d.battlefields.map(m => lineRow(1, m.card, null, [], 1 - (m.have ?? 1))).join('')}</div>
-        ${pathBlock(d)}
+        ${d.metaRef && !L ? fold(`Was dir zur Vorbild-Liste fehlt · ${d.metaRef.missing.reduce((s, x) => s + x.missing, 0)} Karten`, pathBlock(d)) : pathBlock(d)}
         <div class="row" style="margin-top:14px">
           <button class="btn primary" id="copyArena">Für TCG Arena kopieren</button>
           <button class="btn" id="copyDeck">Deckliste kopieren (mit Set-Nummern)</button>
@@ -668,8 +737,8 @@ function buildBlock(d) {
   const nRep = b.replaced.reduce((s, x) => s + x.n, 0), nFill = b.filled.reduce((s, x) => s + x.n, 0), nOpen = b.open.reduce((s, x) => s + x.n, 0);
   const row = m => `<div class="line"${cv(m.card)}><span class="c">${m.count}×</span><span class="n">${esc(cname(m.card))}
     ${m.notes.map(n => `<br><small class="suggest">↺ ${esc(n)}</small>`).join('')}</span><span class="e">${ident(m.card)}</span></div>`;
-  return `<details class="wishbox" style="margin-bottom:16px" open>
-    <summary style="cursor:pointer"><b>🔧 Mit deiner Sammlung nachbauen</b> · ${b.counts.main}/40${b.complete ? ' · komplett spielbar' : ''}</summary>
+  return `<details class="fold">
+    <summary>🔧 Mit deiner Sammlung nachbauen · ${nRep + nFill ? `${nRep + nFill} Karten ersetzt` : 'alle Karten vorhanden'}${b.complete ? ' · spielbar' : ''}</summary><div class="fold-body">
     <p class="sub" style="margin:8px 0 10px">${nRep || nFill ? `${nRep} fehlende Karten durch passende aus deiner Sammlung ersetzt${nFill ? `, ${nFill} Lücken mit Karten aus deinem besten ${esc(d.champion ?? d.legend.name)}-Deck gefüllt` : ''}.`
       : 'Du besitzt alle Karten – das ist die Liste, wie sie ist.'}
       ${nOpen && b.counts.main < 40 ? ` Für ${nOpen} Karten gibt es keinen Ersatz in deiner Sammlung.` : ''}
@@ -683,7 +752,7 @@ function buildBlock(d) {
       <button class="btn primary" data-copybuild="arena" data-src="${esc(deckId(d))}">Nachbau für TCG Arena kopieren</button>
       <button class="btn" data-copybuild="text" data-src="${esc(deckId(d))}">Nachbau als Liste kopieren</button>
     </div>
-  </details>`;
+  </div></details>`;
 }
 
 /* --- Meine Decks (angepinnt) --- */
@@ -798,17 +867,18 @@ function viewMeine() {
       const open = state.pinOpen === p.id;
       return `<div class="deckcard" style="cursor:default">
         <div class="row" style="justify-content:space-between;align-items:flex-start">
-          <div><div class="t">${esc(p.title)}</div>
+          <div><div class="t">${esc(p.title.split(' · ')[0])}</div>
+            ${p.title.includes(' · ') ? `<div class="m" style="margin:2px 0 4px">${esc(p.title.split(' · ').slice(1).join(' · '))}</div>` : ''}
             <div class="m">${p.id.startsWith('imp:') ? '<span class="badge imp">importiert</span> ' : ''}${dots(p.identity)} ${n} Karten · gespeichert ${new Date(p.savedAt).toLocaleDateString('de-DE')}</div></div>
           <span class="badge ${p.status === 'spiele' ? 'ok' : 'warn'}">${PIN_LABEL[p.status]}</span>
         </div>
         ${isOutdated(p) ? '<div class="m" style="margin-top:8px;color:var(--warn)">Es gibt eine neuere Version dieses Decks (Sammlung oder Turnierdaten haben sich geändert).</div>' : ''}
         <div class="row" style="margin-top:10px;gap:6px">
-          <button class="btn sm" data-pinopen="${esc(p.id)}">${open ? 'Liste ausblenden' : 'Liste ansehen'}</button>
+          <button class="btn sm" data-pinopen="${esc(p.id)}">${open ? 'Ausblenden' : 'Liste'}</button>
           <button class="btn sm" data-pinstatus="${esc(p.id)}">${p.status === 'spiele' ? '→ Baue ich' : '→ Spiele ich'}</button>
           ${isOutdated(p) ? `<button class="btn sm" data-pinupdate="${esc(p.id)}">Aktualisieren</button>` : ''}
           ${p.id.startsWith('imp:') ? `<button class="btn sm" data-renmeta="${esc(p.id.slice(4))}">Namen ändern</button>` : ''}
-          <button class="btn sm" data-pinarena="${esc(p.id)}">Für TCG Arena kopieren</button>
+          <button class="btn sm" data-pinarena="${esc(p.id)}" title="Liste für TCG Arena / Rift Atlas kopieren">📋 Kopieren</button>
           <button class="btn sm" data-unpin="${esc(p.id)}">Entfernen</button>
         </div>
         ${open ? pinList(p) : ''}
@@ -816,21 +886,23 @@ function viewMeine() {
     }).join('')}</div>
 
     ${list.length > 1 ? `
-    <h3>Überschneidungen</h3>
+    <details class="fold"><summary>Überschneidungen · ${conflict.length ? `${conflict.length} Karten umstecken` : 'keine Engpässe'}</summary><div class="fold-body">
     <p class="sub">Karten, die mehrere deiner Decks brauchen. Rot: Deine Kopien reichen nicht für alle gleichzeitig –
       diese Karten musst du beim Wechsel umstecken.</p>
     ${conflict.length ? `<h4 style="color:var(--bad)">Umstecken nötig · ${conflict.length} Karten</h4>
       <div class="lines">${conflict.map(u => row(u, true)).join('')}</div>` : '<div class="notice">Keine Engpässe – alle Decks lassen sich gleichzeitig gebaut halten.</div>'}
     ${fine.length ? `<h4>Geteilt, aber genug Kopien · ${fine.length} Karten</h4>
       <div class="lines">${fine.map(u => row(u, false)).join('')}</div>` : ''}
+    </div></details>
 
-    <h3>Deck wechseln</h3>
+    <details class="fold"><summary>Deck wechseln – was muss ich umstecken?</summary><div class="fold-body">
     <p class="sub">Welche Karten musst du aus einem Deck nehmen, um ein anderes zu bauen? Angenommen wird, dass alle
       anderen angepinnten Decks gebaut bleiben.</p>
     <div class="card"><div class="row">
       <label style="flex:1;min-width:150px;font-size:12px;color:var(--dim)">Von<select id="swapFrom"><option value="">–</option>${opts(sw.from)}</select></label>
       <label style="flex:1;min-width:150px;font-size:12px;color:var(--dim)">Zu<select id="swapTo"><option value="">–</option>${opts(sw.to)}</select></label>
-    </div>${from && to && from !== to ? swapPlan(from, to, list) : ''}</div>` : ''}`;
+    </div>${from && to && from !== to ? swapPlan(from, to, list) : ''}</div>
+    </div></details>` : ''}`;
 }
 
 /** Angepinnte Fassung als Textliste – zum Wiederherstellen einer gelöschten Liste. */
@@ -1084,8 +1156,8 @@ function viewMeta() {
        entfernt bist und welche Karten dir fehlen.
        <b>Enthält die Liste eine Legende, fließt sie in den Deckbau ein</b> – und zwar bevorzugt: Deine hochgeladene
        Liste wird zum Vorbild für diese Legende, vor den mitgelieferten Listen.</p>
-    <div class="card" style="margin-bottom:20px">
-      <h3 style="margin-top:0">Turnierliste hinzufügen</h3>
+    <details class="fold"${saved.length && !state.metaNotice ? '' : ' open'}><summary>➕ Liste hochladen</summary><div class="fold-body">
+    <div class="card" style="margin-bottom:6px">
       <p class="sub" style="margin:0 0 10px;font-size:12px">Erkannt werden u. a. „3 Defy“, „3x Defy“, „Defy x3“,
         „2 Onslaught (VEN) #081“ und Abschnitte wie „Legend:“, „Champion:“, „MainDeck:“, „Battlefields:“, „Runes:“.
         Das Sideboard wird ignoriert. Ohne Namen benennt die App die Liste nach der Legende.</p>
@@ -1101,8 +1173,8 @@ function viewMeta() {
         <label class="btn">Textdatei wählen<input type="file" id="metaFile" accept=".txt,.csv,.dek,text/plain" hidden></label>
       </div>
       ${state.metaNotice ? `<div class="notice" style="margin-top:12px">${state.metaNotice}</div>` : ''}
-    </div>
-    ${builtinBlock()}
+    </div></div></details>
+    ${fold('Mitgelieferte Turnier- und Community-Listen', builtinBlock())}
     <h3>Eigene Listen</h3>
     ${orphanPins().length ? `<div class="notice" style="margin-bottom:12px"><b>Liste fehlt, ist aber in „Meine Decks“ gespeichert:</b>
       ${orphanPins().map(p => `<div class="row" style="margin-top:6px;gap:8px"><span>${esc(p.title)}</span>
@@ -1385,7 +1457,9 @@ document.addEventListener('click', async e => {
   if (!t) return;
 
   if (t.dataset.view) { state.view = t.dataset.view; state.deckIdx = null; state.openList = null; state.metaNotice = null; return render(); }
-  if (t.dataset.openlist) { state.view = 'meta'; state.openList = t.dataset.openlist; window.scrollTo(0, 0); return render(); }
+  if (t.dataset.openlist) { state.openList = t.dataset.openlist; window.scrollTo(0, 0); return render(); }
+  if (t.dataset.deckmode) { state.deckMode = t.dataset.deckmode; state.openList = null; state.deckIdx = null; return render(); }
+  if (t.dataset.eventgroup) { state.eventGroup = t.dataset.eventgroup; return render(); }
   if (t.id === 'backMeta') { state.openList = null; return render(); }
   if (t.dataset.pinlist) {
     const d = listById(t.dataset.pinlist);
@@ -1428,7 +1502,7 @@ document.addEventListener('click', async e => {
   }
   if (t.id === 'clearColl') {
     localStorage.removeItem(KEY.coll);
-    state.entries = []; state.inv = { owned: new Map() }; state.decks = state.imported = state.lists = null; state.unmatched = [];
+    state.entries = []; state.inv = { owned: new Map() }; state.decks = state.imported = state.lists = state.events = null; state.unmatched = [];
     renderHead(); return render();
   }
   if (t.id === 'copyDeck') return copy(deckToText(detailDeck()), t);
@@ -1455,7 +1529,7 @@ document.addEventListener('click', async e => {
       ${cnt} Hauptdeck-Karten${parsed.unknown.length ? `, <b>${parsed.unknown.length} Zeile(n) nicht erkannt:</b> ${parsed.unknown.slice(0, 5).map(esc).join(' · ')}` : ''}.`;
     const own = $('#metaOwn').checked;
     store(KEY.meta, [...read(KEY.meta, []), { id: String(Date.now()), name, text, own }]);
-    state.decks = state.imported = state.lists = null;
+    state.decks = state.imported = state.lists = state.events = null;
     return render();
   }
   if (t.dataset.renmeta) {
@@ -1464,7 +1538,7 @@ document.addEventListener('click', async e => {
     if (!name) return;
     store(KEY.meta, saved.map(x => (x.id === id ? { ...x, name } : x)));
     store(KEY.pins, pins().map(p => (p.id === 'imp:' + id ? { ...p, title: name } : p)));
-    state.decks = state.imported = state.lists = null;
+    state.decks = state.imported = state.lists = state.events = null;
     return render();
   }
   if (t.dataset.pinimp) {
@@ -1482,7 +1556,7 @@ document.addEventListener('click', async e => {
     if (!m || !confirm(`„${m.name}“ löschen? Du kannst sie danach unter „Zuletzt gelöscht“ wiederherstellen.`)) return;
     store(KEY.trash, [{ ...m, deletedAt: Date.now() }, ...read(KEY.trash, [])].slice(0, 30));
     store(KEY.meta, saved.filter(d => d.id !== m.id));
-    state.decks = state.imported = state.lists = null; return render();
+    state.decks = state.imported = state.lists = state.events = null; return render();
   }
   if (t.dataset.restoremeta) {
     const trash = read(KEY.trash, []), m = trash.find(d => d.id === t.dataset.restoremeta);
@@ -1491,7 +1565,7 @@ document.addEventListener('click', async e => {
       store(KEY.meta, [...read(KEY.meta, []).filter(d => d.id !== list.id), list]);
       store(KEY.trash, trash.filter(d => d.id !== list.id));
     }
-    state.decks = state.imported = state.lists = null; return render();
+    state.decks = state.imported = state.lists = state.events = null; return render();
   }
   if (t.dataset.restorepin) {
     const p = pinOf(t.dataset.restorepin), id = p?.id.slice(4);
@@ -1499,7 +1573,7 @@ document.addEventListener('click', async e => {
     const trash = read(KEY.trash, []), orig = trash.find(d => d.id === id);
     if (orig) { const { deletedAt, ...list } = orig; store(KEY.meta, [...read(KEY.meta, []), list]); store(KEY.trash, trash.filter(d => d.id !== id)); }
     else if (p) store(KEY.meta, [...read(KEY.meta, []), { id, name: p.title, text: pinToText(p), own: false, legend: p.legendKey }]);
-    state.decks = state.imported = state.lists = null; return render();
+    state.decks = state.imported = state.lists = state.events = null; return render();
   }
   if (t.id === 'dlBackup') {
     const data = { app: 'riftbound-collection', version: 1, savedAt: new Date().toISOString(),
@@ -1551,7 +1625,7 @@ document.addEventListener('change', e => {
   if (e.target.dataset?.legendfor) {
     const id = e.target.dataset.legendfor, legend = e.target.value || null;
     store(KEY.meta, read(KEY.meta, []).map(x => (x.id === id ? { ...x, legend } : x)));
-    state.decks = state.imported = state.lists = null;
+    state.decks = state.imported = state.lists = state.events = null;
     // Angepinnte Fassung auf die neue Legende umstellen
     const old = pinOf('imp:' + id), d = importedById(id);
     if (old && d) store(KEY.pins, pins().map(p => (p.id === old.id ? snapshot(d, old.status) : p)));
@@ -1572,7 +1646,7 @@ document.addEventListener('change', e => {
         store(KEY.pins, [...pins(), ...addPins]);
         state.backupNotice = `Sicherung geladen: ${addLists.length} Liste(n) und ${addPins.length} angepinnte(s) Deck(s) hinzugefügt.`;
       } catch (err) { state.backupNotice = `Datei nicht lesbar: ${esc(err.message)}`; }
-      state.decks = state.imported = state.lists = null; render();
+      state.decks = state.imported = state.lists = state.events = null; render();
     });
     return;
   }
