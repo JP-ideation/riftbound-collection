@@ -2,7 +2,7 @@ import { parseCollection, parseDeckList, serializeCollection } from './parser.js
 import { loadCards, buildInventory, resolve, key } from './db.js';
 import { suggestDecks, substituteBuild, deckToText, deckToArena, deckTitle, checkDeck, championOf, groupByDomain, RULES, evaluateList } from './deckbuilder.js';
 import { buildGuide } from './guide.js';
-import { isBanned, BANNED_AS_OF } from './banlist.js';
+import { isBanned, BANNED, BANNED_AS_OF } from './banlist.js';
 import { SECTIONS, KEYWORDS, keywordsIn } from './rules.js';
 
 const KEY = { coll: 'rb.collection.v1', meta: 'rb.metadecks.v1', friends: 'rb.friends.v1', deckView: 'rb.deckview.v1', pins: 'rb.pins.v1', trash: 'rb.metatrash.v1' };
@@ -100,7 +100,7 @@ function listDecks() {
     const main = [...m.cards].map(([k, count]) => ({ card: state.db.byName.get(k), count })).filter(x => x.card);
     try {
       const d = evaluateList(state.inv, legend, { name: m.name, main }, state.db.cards, state.community, meta);
-      d.listDeck = { id: listId(m.name), name: m.name, missing: d.imported.missing, kind: m.community ? 'Community-Liste' : 'Turnierliste',
+      d.listDeck = { id: listId(m.name), name: m.name, missing: d.imported.missing, kind: m.community ? 'Community-Liste' : 'Turnierliste', banned: bannedIn(main),
         info: m.community ? `Piltover Archive, Stand ${comDate}` : `${m.builtin?.placement ?? ''} · ${m.builtin?.date ?? ''} · ${m.builtin?.source ?? ''}` };
       delete d.imported;
       return d;
@@ -121,7 +121,7 @@ function eventDecks() {
     try {
       const d = evaluateList(state.inv, legend, { name: m.name, main }, state.db.cards, state.community, meta);
       const b = m.builtin;
-      d.listDeck = { id: listId(m.name), name: m.name, missing: d.imported.missing, kind: 'Turnierliste',
+      d.listDeck = { id: listId(m.name), name: m.name, missing: d.imported.missing, kind: 'Turnierliste', banned: bannedIn(main),
         info: `${b.placement} · ${b.date} · ${b.source}`, group: b.group, placement: parseInt(b.placement) || 99,
         player: /\(([^)]+)\)/.exec(b.event)?.[1] ?? '', date: b.date, players: +(/(\d+) Spieler/.exec(b.event)?.[1] ?? 0),
         legendOwned: state.inv.owned.has(m.legendKey) };
@@ -131,6 +131,9 @@ function eventDecks() {
   }).filter(Boolean);
   return state.events;
 }
+/** Gebannte Karten einer Liste als „3× Name“ (Liste = Paare [Karte, Anzahl]). */
+const bannedIn = main => main.filter(x => x.card && isBanned(x.card)).map(x => `${x.count}× ${cname(x.card)}`);
+const banDate = () => new Date(BANNED_AS_OF).toLocaleDateString('de-DE');
 const listById = id => listDecks().find(d => d.listDeck.id === id) ?? eventDecks().find(d => d.listDeck.id === id);
 /** Nachbau einer Liste mit deiner Sammlung (bei automatisch gebauten Decks: das Deck selbst). */
 const buildCache = new WeakMap();
@@ -436,7 +439,8 @@ const deckView = () => ({ filter: 'alle', sort: 'bewertung', beginner: false, ..
 const DIFF_CLS = ['ok', 'warn', 'bad'];
 /** Tier der Legende laut mitgelieferter Tierliste (data/meta.json), sonst undefined. */
 const tierOf = d => state.meta?.tiers?.legends?.[d.legend.fullName ?? d.legend.name];
-const tierBadge = d => (tierOf(d) ? `<span class="badge tier t${tierOf(d)}" title="Tierliste ${esc(state.meta.tiers.source)}, Stand ${esc(state.meta.tiers.date)}">Tier ${tierOf(d)}</span>` : '');
+const tiersPreBan = () => (state.meta?.tiers?.date ?? '') < BANNED_AS_OF;
+const tierBadge = d => (tierOf(d) ? `<span class="badge tier t${tierOf(d)}" title="Tierliste ${esc(state.meta.tiers.source)}, Stand ${esc(state.meta.tiers.date)}${tiersPreBan() ? ` – vor der Bannwelle vom ${banDate()}` : ''}">Tier ${tierOf(d)}${tiersPreBan() ? '*' : ''}</span>` : '');
 const diffBadge = d => `<span class="badge ${DIFF_CLS[d.difficulty.level]}" title="Schwierigkeit ${num(d.difficulty.score)}/10">${esc(d.difficulty.label)}</span>`;
 const num = x => (Math.round(x * 10) / 10).toString().replace('.', ',');
 
@@ -467,6 +471,9 @@ function viewEvents() {
     <p class="sub">${players ? `${players} Spieler · ` : ''}${new Date(newest(g)).toLocaleDateString('de-DE')} ·
       ${Object.entries(count).sort((a, b) => b[1] - a[1]).map(([k, n]) => `${esc(k)} ${n}×`).join(', ')}.
       Tippe ein Deck an: Liste, was dir fehlt, Nachbau mit deinen Karten und Kopieren für TCG Arena.</p>
+    ${ds.some(d => d.listDeck.banned.length) ? `<div class="notice" style="margin-bottom:12px"><b>⛔ Bannliste ab ${banDate()}:</b>
+      ${ds.filter(d => d.listDeck.banned.length).length} von ${ds.length} Listen enthalten Karten, die inzwischen gebannt sind.
+      Die Listen zeigen, was damals gespielt wurde; der Nachbau ersetzt die gebannten Karten.</div>` : ''}
     <div class="decklist">${ds.map(d => `
       <button class="deckcard" data-openlist="${esc(d.listDeck.id)}">
         <div class="row" style="justify-content:space-between;align-items:flex-start">
@@ -476,6 +483,7 @@ function viewEvents() {
             ${tierBadge(d)}
             <span class="badge ${d.metaRef.owned >= 0.9 ? 'ok' : d.metaRef.owned >= 0.6 ? 'warn' : 'bad'}">du besitzt ${pct(d.metaRef.owned, 1)}%</span>
             ${d.listDeck.legendOwned ? '' : '<span class="badge bad">Legende fehlt dir</span>'}
+            ${d.listDeck.banned.length ? `<span class="badge bad" title="${esc(d.listDeck.banned.join(', '))}">⛔ ${d.listDeck.banned.length} gebannt</span>` : ''}
           </div>
         </div>
       </button>`).join('')}</div>`;
@@ -583,7 +591,9 @@ function viewDeckDetail(d) {
       ${L && d.counts.main !== 40 ? ` · <b>die Liste hat ${d.counts.main} statt 40 Hauptdeck-Karten</b>` : ''}
       ${d.hasChampion ? '' : L ? ` · <b>keine Champion-Einheit von ${esc(d.champion)} in der Liste</b> (Pflicht)` : ` · <b>keine Champion-Einheit von ${esc(d.champion)} im Bestand</b> (Pflicht)`}
       ${d.metaRef ? (L ? ` · du besitzt ${pct(d.metaRef.owned, 1)}% der Liste` : ` · setzt ${pct(d.metaRef.coverage, 1)}% der Turnierliste um`) : ''}
-      ${tierOf(d) ? ` · <b>Tier ${tierOf(d)}</b> laut ${esc(state.meta.tiers.source)} (Stand ${new Date(state.meta.tiers.date).toLocaleDateString('de-DE')})` : ''}</p>
+      ${tierOf(d) ? ` · <b>Tier ${tierOf(d)}</b> laut ${esc(state.meta.tiers.source)} (Stand ${new Date(state.meta.tiers.date).toLocaleDateString('de-DE')}${tiersPreBan() ? `, <b>vor der Bannwelle vom ${banDate()}</b> – Einstufung kann sich ändern` : ''})` : ''}</p>
+      ${d.listDeck?.banned?.length ? `<div class="notice" style="margin:8px 0"><b>⛔ Ab ${banDate()} gebannt:</b> ${esc(d.listDeck.banned.join(', '))}.
+        Für Turniere ab dann musst du sie ersetzen – „Mit deiner Sammlung nachbauen“ und „Baue ich“ tauschen sie schon aus.</div>` : ''}
 
     ${M ? deckTabs(d, M, tab) : ''}
     ${pinButtons(d)}
@@ -865,6 +875,8 @@ function viewMeine() {
     <div class="decklist">${list.map(p => {
       const n = p.main.reduce((s, [, c]) => s + c, 0);
       const open = state.pinOpen === p.id;
+      const ban = [...p.main.filter(([k]) => BANNED.has(k)).map(([k, c]) => `${c}× ${pinCard(k) ? cname(pinCard(k)) : k}`),
+        ...(p.battlefields ?? []).filter(k => BANNED.has(k)).map(k => pinCard(k) ? cname(pinCard(k)) : k)];
       return `<div class="deckcard" style="cursor:default">
         <div class="row" style="justify-content:space-between;align-items:flex-start">
           <div><div class="t">${esc(p.title.split(' · ')[0])}</div>
@@ -872,6 +884,7 @@ function viewMeine() {
             <div class="m">${p.id.startsWith('imp:') ? '<span class="badge imp">importiert</span> ' : ''}${dots(p.identity)} ${n} Karten · gespeichert ${new Date(p.savedAt).toLocaleDateString('de-DE')}</div></div>
           <span class="badge ${p.status === 'spiele' ? 'ok' : 'warn'}">${PIN_LABEL[p.status]}</span>
         </div>
+        ${ban.length ? `<div class="m" style="margin-top:8px;color:var(--bad)"><b>⛔ Ab ${banDate()} gebannt:</b> ${esc(ban.join(', '))} – vor dem nächsten Turnier ersetzen.</div>` : ''}
         ${isOutdated(p) ? '<div class="m" style="margin-top:8px;color:var(--warn)">Es gibt eine neuere Version dieses Decks (Sammlung oder Turnierdaten haben sich geändert).</div>' : ''}
         <div class="row" style="margin-top:10px;gap:6px">
           <button class="btn sm" data-pinopen="${esc(p.id)}">${open ? 'Ausblenden' : 'Liste'}</button>
