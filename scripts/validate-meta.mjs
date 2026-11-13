@@ -13,7 +13,7 @@
  * Hauptdeck höchstens 40. Tier-Einträge müssen auf echte Legenden zeigen.
  */
 import { readFile } from 'node:fs/promises';
-import { BANNED } from '../js/banlist.js';
+import { BANNED, BANNED_NEW, BANNED_AS_OF } from '../js/banlist.js';
 
 const cards = JSON.parse(await readFile(new URL('../data/cards.json', import.meta.url), 'utf8')).cards;
 const meta = JSON.parse(await readFile(new URL('../data/meta.json', import.meta.url), 'utf8'));
@@ -23,6 +23,7 @@ for (const c of cards) if (!byName.has(c.fullName.toLowerCase())) byName.set(c.f
 
 const errors = [];
 const warn = [];
+let preBan = 0;
 for (const [i, d] of meta.decks.entries()) {
   const where = `Deck ${i + 1} (${d.name ?? '?'})`;
   const legend = byName.get(String(d.legend ?? '').toLowerCase());
@@ -35,7 +36,12 @@ for (const [i, d] of meta.decks.entries()) {
     if (!c) { errors.push(`${where}: Karte "${name}" nicht in der Datenbank`); continue; }
     if (!['unit', 'spell', 'gear'].includes(c.type)) errors.push(`${where}: "${name}" ist ${c.type}, gehört nicht ins Hauptdeck`);
     if (c.domains.some(x => x !== 'colorless' && !ident.has(x))) errors.push(`${where}: "${name}" (${c.domains}) passt nicht zur Legende (${legend.domains})`);
-    if (BANNED.has(c.fullName.toLowerCase())) errors.push(`${where}: "${name}" ist gebannt`);
+    // Listen von vor der letzten Bannwelle dürfen deren Karten enthalten (Turnierhistorie);
+    // die App markiert sie und ersetzt sie im Nachbau.
+    if (BANNED.has(c.fullName.toLowerCase())) {
+      if (BANNED_NEW.has(c.fullName.toLowerCase()) && d.date < BANNED_AS_OF) preBan++;
+      else errors.push(`${where}: "${name}" ist gebannt`);
+    }
     const max = /\[Unique\]/.test(c.text ?? '') ? 1 : 3;
     if (!Number.isInteger(n) || n < 1 || n > max) errors.push(`${where}: "${name}" Anzahl ${n} (erlaubt 1–${max})`);
     total += n;
@@ -49,6 +55,7 @@ for (const name of Object.keys(meta.tiers?.legends ?? {})) {
 }
 
 for (const w of warn) console.log('Hinweis:', w);
+if (preBan) console.log(`Hinweis: ${preBan} Karten der Bannwelle vom ${BANNED_AS_OF} in älteren Listen (erlaubt, App markiert sie).`);
 if (errors.length) {
   for (const e of errors) console.error('FEHLER:', e);
   console.error(`${errors.length} Fehler – data/meta.json NICHT veröffentlichen.`);
