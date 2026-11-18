@@ -23,7 +23,9 @@ import { difficulty } from './difficulty.js';
 /** Identitaetsschluessel: Name + Beiname, siehe db.js. */
 export const key = c => (c.fullName ?? c.name).toLowerCase();
 
-export const RULES = { MAIN: 40, RUNES: 12, BATTLEFIELDS: 3, MAX_COPIES: 3, SIGNATURES: 3 };
+// SIDE: Side Deck (Sideboard) im Constructed, bis zu 10 Karten (Turnierregeln seit 24.07.2026);
+// die Kopiengrenze gilt für Haupt- und Side Deck zusammen, getauscht wird 1:1 zwischen den Spielen.
+export const RULES = { MAIN: 40, RUNES: 12, BATTLEFIELDS: 3, MAX_COPIES: 3, SIGNATURES: 3, SIDE: 10 };
 
 // Seltenheit nur als schwaches Signal: Turnierdecks bestehen zu großen Teilen
 // aus Commons (Defy, Charm, Punch First) – Seltenheit ist kein Stärkemaß.
@@ -680,8 +682,10 @@ export function evaluateList(inventory, legend, list, allCards, community = null
   // Was fehlt dir, und was aus deinem Bestand könnte es ersetzen?
   const need = main.reduce((s, m) => s + m.count, 0);
   const have = main.reduce((s, m) => s + m.have, 0);
-  const missingMain = main.filter(m => m.missing > 0)
-    .map(m => ({ card: m.card, need: m.count, have: m.have, missing: m.missing }))
+  // Gebannte Karten zählen beim Nachbau als fehlend – sie werden ersetzt, auch wenn du sie besitzt.
+  const missingMain = main.filter(m => m.missing > 0 || isBanned(m.card))
+    .map(m => (isBanned(m.card) ? { card: m.card, need: m.count, have: 0, missing: m.count, banned: true }
+      : { card: m.card, need: m.count, have: m.have, missing: m.missing }))
     .sort((a, b) => b.missing - a.missing);
   const metaRef = {
     name: list.name, coverage: need ? have / need : 0, owned: need ? have / need : 0, need,
@@ -706,11 +710,43 @@ export function evaluateList(inventory, legend, list, allCards, community = null
     avgEnergy: Math.round((main.reduce((s, m) => s + (m.card.energy ?? 0) * m.count, 0) / Math.max(total, 1)) * 100) / 100,
     engine: engineReport(legend, ctx),
     metaDecks: 0,
+    side: mergeSide(list.side).map(m => ({ ...m, have: Math.min(m.count, Math.max(0, ownQty(m.card) - (merged.get(key(m.card))?.count ?? 0))) })),
     imported: { name: list.name, missing: need - have + missingOther },
   };
   deck.difficulty = difficulty(deck);
   return deck;
 }
+
+/** Side-Deck-Einträge gleicher Karte zusammenfassen. */
+export function mergeSide(side = []) {
+  const m = new Map();
+  for (const { card, count } of side ?? []) {
+    if (!card) continue;
+    const hit = m.get(key(card));
+    if (hit) hit.count += count; else m.set(key(card), { card, count });
+  }
+  return [...m.values()];
+}
+
+/**
+ * Probleme eines Side Decks: mehr als 10 Karten, Kopiengrenze zusammen mit dem
+ * Hauptdeck, gebannte oder nicht spielbare Karten (falsche Farbe, Runen …).
+ */
+export function checkSide(legend, main, side) {
+  const out = [];
+  const total = side.reduce((s, m) => s + m.count, 0);
+  if (total > RULES.SIDE) out.push(`${total} Karten – erlaubt sind höchstens ${RULES.SIDE}`);
+  const identity = new Set((legend?.domains ?? []).filter(d => d !== 'colorless'));
+  for (const m of side) {
+    const inMain = main.filter(x => key(x.card) === key(m.card)).reduce((s, x) => s + x.count, 0);
+    if (inMain + m.count > maxCopies(m.card)) out.push(`${cardName(m.card)}: ${inMain} im Hauptdeck + ${m.count} im Side Deck – mehr als ${maxCopies(m.card)} Kopien`);
+    if (isBanned(m.card)) out.push(`${cardName(m.card)} ist gebannt`);
+    if (!MAIN_TYPES.has(m.card.type)) out.push(`${cardName(m.card)} ist keine Hauptdeck-Karte (Side Deck nur Einheiten, Zauber, Ausrüstung)`);
+    else if (legend && !inIdentity(m.card, identity)) out.push(`${cardName(m.card)} passt nicht zu den Farben der Legende`);
+  }
+  return out;
+}
+const cardName = c => c.fullName ?? c.name;
 
 /**
  * Eine Liste (aus evaluateList) mit deiner Sammlung nachbauen: Was du hast,
@@ -731,7 +767,7 @@ export function substituteBuild(deck, inventory, fallback = null) {
     out.set(k, e);
     used.set(k, (used.get(k) ?? 0) + n);
   };
-  for (const m of deck.main) if (m.have > 0) add(m.card, m.have);
+  for (const m of deck.main) if (m.have > 0 && !isBanned(m.card)) add(m.card, m.have);
   const replaced = [], open = [];
   for (const miss of deck.metaRef?.missing ?? []) {
     let need = miss.missing;
@@ -791,6 +827,9 @@ export function substituteBuild(deck, inventory, fallback = null) {
   const hasChampion = !champion || main.some(m => m.card.type === 'unit' && m.card.name === champion && m.card.subtitle);
   return {
     ...deck, main, runes, battlefields, hasChampion,
+    // Side Deck: nur, was du neben dem Nachbau noch frei hast
+    side: (deck.side ?? []).map(m => ({ card: m.card, count: Math.min(m.count, Math.max(0, ownQty(m.card) - (used.get(key(m.card)) ?? 0))) }))
+      .filter(m => m.count > 0).map(m => ({ ...m, have: m.count })),
     counts: { main: total, runes: runeCount, battlefields: battlefields.length },
     complete: total === RULES.MAIN && runeCount === RULES.RUNES && battlefields.length === RULES.BATTLEFIELDS && hasChampion,
     replaced, open, filled, isBuild: true,
@@ -1089,6 +1128,7 @@ export function deckToArena(deck) {
     '', 'MainDeck:', lines(groupByDomain({ ...deck, main }).flatMap(g => g.cards)),
     '', 'Battlefields:', lines(deck.battlefields.map(b => ({ card: b.card, count: 1 }))),
     '', 'Runes:', lines(deck.runes),
+    ...(deck.side?.length ? ['', 'Sideboard:', lines(deck.side)] : []),
   ].join('\n') + '\n';
 }
 
@@ -1107,5 +1147,6 @@ export function deckToText(deck) {
   const sec = (title, list) => list.length ? `\n// ${title}\n` + list.map(x => line(x.count, x.card)).join('\n') : '';
   return `// ${deckTitle(deck)}\n// Legende\n${line(1, deck.legend)}`
     + groupByDomain(deck).map(g => sec(`Hauptdeck – ${g.label} (${g.count})`, g.cards)).join('')
-    + sec('Runen', deck.runes) + sec('Schlachtfelder', deck.battlefields) + '\n';
+    + sec('Runen', deck.runes) + sec('Schlachtfelder', deck.battlefields)
+    + (deck.side?.length ? `\n\nSideboard:\n` + deck.side.map(x => line(x.count, x.card)).join('\n') : '') + '\n';
 }

@@ -1,6 +1,6 @@
 import { parseCollection, parseDeckList, serializeCollection } from './parser.js';
 import { loadCards, buildInventory, resolve, key } from './db.js';
-import { suggestDecks, substituteBuild, deckToText, deckToArena, deckTitle, checkDeck, championOf, groupByDomain, RULES, evaluateList } from './deckbuilder.js';
+import { suggestDecks, substituteBuild, deckToText, deckToArena, deckTitle, checkDeck, championOf, groupByDomain, RULES, evaluateList, checkSide, mergeSide } from './deckbuilder.js';
 import { buildGuide } from './guide.js';
 import { isBanned, BANNED, BANNED_AS_OF } from './banlist.js';
 import { SECTIONS, KEYWORDS, keywordsIn } from './rules.js';
@@ -71,9 +71,9 @@ function importedDecks() {
   state.imported = saved.map(m => {
     // Eine kaputte Liste darf die anderen nicht mitreißen – sie wird gemeldet, nicht versteckt.
     try {
-      const { legend, main, battlefields, runes } = parseMetaList(m.text, m.legend);
+      const { legend, main, battlefields, runes, side } = parseMetaList(m.text, m.legend);
       if (!legend || !main.length) { state.importSkipped.push({ m, why: !legend ? 'keine Legende erkannt' : 'keine Hauptdeck-Karten erkannt' }); return null; }
-      const d = evaluateList(state.inv, legend, { name: m.name, main, runes, battlefields }, state.db.cards, state.community, meta);
+      const d = evaluateList(state.inv, legend, { name: m.name, main, runes, battlefields, side }, state.db.cards, state.community, meta);
       Object.assign(d.imported, { id: m.id, own: !!m.own });
       return d;
     } catch (err) {
@@ -158,7 +158,7 @@ const deckId = d => (d.imported ? 'imp:' + d.imported.id : d.listDeck ? 'list:' 
  * dem Deckbau nicht, werden im Meta-Tab aber trotzdem ausgewertet.
  */
 function parseMetaList(text, legendKey = null) {
-  const { entries } = parseDeckList(text);
+  const { entries, sideboard } = parseDeckList(text);
   const rows = entries.map(e => {
     const found = resolve(state.db, e);
     return { e, card: found ? (state.db.byName.get(key(found)) ?? found) : null };
@@ -172,8 +172,10 @@ function parseMetaList(text, legendKey = null) {
   const guessed = !chosen && !listed && !!legend;
   const battlefields = rows.filter(r => r.card?.type === 'battlefield').map(r => r.card);
   const runes = rows.filter(r => r.card?.type === 'rune').map(r => ({ card: r.card, count: r.e.qty }));
-  const unknown = rows.filter(r => !r.card).map(r => r.e.raw);
-  return { legend, guessed, main, battlefields, runes, unknown };
+  const sideRows = sideboard.map(e => { const f = resolve(state.db, e); return { e, card: f ? (state.db.byName.get(key(f)) ?? f) : null }; });
+  const side = mergeSide(sideRows.filter(r => r.card).map(r => ({ card: r.card, count: r.e.qty })));
+  const unknown = [...rows, ...sideRows].filter(r => !r.card).map(r => r.e.raw);
+  return { legend, guessed, main, battlefields, runes, side, unknown };
 }
 
 /**
@@ -625,6 +627,7 @@ function viewDeckDetail(d) {
         <h3>Schlachtfelder · ${d.counts.battlefields}/3</h3>
         ${d.battlefields[0]?.auto ? '<p class="sub" style="margin:0 0 6px">Nicht in der Liste – aus deinem Bestand ergänzt.</p>' : ''}
         <div class="lines">${d.battlefields.map(m => lineRow(1, m.card, null, [], 1 - (m.have ?? 1))).join('')}</div>
+        ${sideBlock(d)}
         ${d.metaRef && !L ? fold(`Was dir zur Vorbild-Liste fehlt · ${d.metaRef.missing.reduce((s, x) => s + x.missing, 0)} Karten`, pathBlock(d)) : pathBlock(d)}
         <div class="row" style="margin-top:14px">
           <button class="btn primary" id="copyArena">Für TCG Arena kopieren</button>
@@ -689,8 +692,8 @@ function pathBlock(d) {
       ? `Du besitzt ${pct(m.owned, 1)}% der Hauptdeck-Karten${m.missing.length ? `, es fehlen ${m.missing.reduce((s, x) => s + x.missing, 0)}. Bis du sie hast, kannst du die vorgeschlagenen Karten aus deiner Sammlung spielen` : ''}.`
       : `Ausbauziel, kein Muss: Dein Deck oben ist schon spielbar. Vorbild ist
       <b>${esc(m.name)}</b> – davon besitzt du ${pct(m.owned, 1)}%${m.missing.length ? `, es fehlen ${m.missing.reduce((s, x) => s + x.missing, 0)} Karten` : ''}.`}</p>
-    <div class="lines">${m.missing.map(x => `<div class="line missing"${cv(x.card)}><span class="c">fehlt ${x.missing}×</span>
-      <span class="n">${esc(cname(x.card))}${suggestLine(x)}</span><span class="e">${ident(x.card)} · du hast ${x.have}</span></div>`).join('')
+    <div class="lines">${m.missing.map(x => `<div class="line missing"${cv(x.card)}><span class="c">${x.banned ? `⛔ ${x.missing}×` : `fehlt ${x.missing}×`}</span>
+      <span class="n">${esc(cname(x.card))}${suggestLine(x)}</span><span class="e">${ident(x.card)} · ${x.banned ? `gebannt ab ${banDate()}` : `du hast ${x.have}`}</span></div>`).join('')
       || '<div class="line">Du besitzt alle Karten dieser Liste.</div>'}</div>
     ${communityNote(d)}
   </div>`;
@@ -776,10 +779,13 @@ const pinCard = k => state.db.byName.get(k);
  * selbst – ein Deck, das du gebaut hast, soll nicht nach einem Sammlungs- oder
  * Meta-Update still anders aussehen. Neuere Versionen werden nur angezeigt.
  */
-function snapshot(d, status) {
+function snapshot(d, status, old = null) {
   // Listen werden als Nachbau mit deiner Sammlung gespeichert – das ist das Deck, das du wirklich baust.
   const b = buildOf(d);
+  // Side Deck: aus der Liste; sonst ein von Hand eingefügtes behalten (z. B. beim Aktualisieren).
+  const side = (b.side ?? []).length ? b.side.map(m => [key(m.card), m.count]) : (old ?? pinOf(deckId(d)))?.side ?? [];
   return {
+    side,
     id: deckId(d), legendKey: key(d.legend), title: (d.imported ?? d.listDeck)?.name ?? deckTitle(d), status, savedAt: Date.now(),
     identity: d.identity,
     main: b.main.map(m => [key(m.card), m.count]),
@@ -833,12 +839,15 @@ function usage(list) {
   const use = new Map();
   const add = (p, k, n, kind) => {
     const u = use.get(k) ?? { k, kind, per: [], total: 0 };
-    u.per.push({ p, n }); u.total += n; use.set(k, u);
+    const same = u.per.find(x => x.p === p);   // Haupt- und Side Deck desselben Decks zusammen
+    if (same) same.n += n; else u.per.push({ p, n });
+    u.total += n; use.set(k, u);
   };
   for (const p of list) {
     p.main.forEach(([k, n]) => add(p, k, n, 'main'));
     p.runes.forEach(([k, n]) => add(p, k, n, 'rune'));
     p.battlefields.forEach(k => add(p, k, 1, 'bf'));
+    (p.side ?? []).forEach(([k, n]) => add(p, k, n, 'side'));
   }
   return [...use.values()];
 }
@@ -853,7 +862,7 @@ function viewMeine() {
   const shared = usage(list).filter(u => u.per.length > 1);
   const conflict = shared.filter(u => u.total > ownedQty(u.k)).sort((a, b) => (b.total - ownedQty(b.k)) - (a.total - ownedQty(a.k)));
   const fine = shared.filter(u => u.total <= ownedQty(u.k));
-  const kindLabel = { main: '', rune: ' (Rune)', bf: ' (Schlachtfeld)' };
+  const kindLabel = { main: '', rune: ' (Rune)', bf: ' (Schlachtfeld)', side: ' (Side Deck)' };
   const row = (u, bad) => {
     const c = pinCard(u.k);
     return `<div class="line ${bad ? 'missing' : ''}" style="display:block"${cv(c)}>
@@ -935,6 +944,7 @@ function pinAsDeck(p) {
     legend, champion: championOf(legend, state.db.cards), identity: p.identity,
     main: rows(p.main), runes: rows(p.runes),
     battlefields: p.battlefields.map(k => ({ card: pinCard(k), count: 1 })).filter(m => m.card),
+    side: rows(p.side ?? []),
   };
 }
 
@@ -1010,7 +1020,42 @@ function pinList(p) {
       <div class="lines">${g.cards.map(rowsHtml).join('')}</div>`).join('')}
     <h4 class="domhead">Runen</h4><div class="lines">${rows(p.runes.map(([k, count]) => ({ card: pinCard(k), count })).filter(m => m.card))}</div>
     <h4 class="domhead">Schlachtfelder</h4><div class="lines">${rows(p.battlefields.map(k => ({ card: pinCard(k), count: 1 })).filter(m => m.card))}</div>
+    ${pinSide(p, legend, main)}
   </div>`;
+}
+
+/** Side Deck eines angepinnten Decks: Liste, Prüfung und Feld zum Einfügen/Ändern. */
+function pinSide(p, legend, main) {
+  const side = (p.side ?? []).map(([k, count]) => ({ card: pinCard(k), count })).filter(m => m.card);
+  const n = side.reduce((s, m) => s + m.count, 0);
+  const probs = legend ? checkSide(legend, p.main.map(([k, count]) => ({ card: pinCard(k), count })).filter(m => m.card), side) : [];
+  const text = side.map(m => `${m.count} ${cname(m.card)}`).join('\n');
+  const msg = state.sideNotice?.id === p.id ? `<div class="notice" style="margin:6px 0">${state.sideNotice.html}</div>` : '';
+  return `<h4 class="domhead">Side Deck · ${n}/${RULES.SIDE}</h4>
+    ${side.length ? `<div class="lines">${side.map(m => {
+      const miss = Math.max(0, m.count - Math.max(0, ownedQty(key(m.card)) - (p.main.find(([x]) => x === key(m.card))?.[1] ?? 0)));
+      return lineRow(m.count, m.card, null, [], miss);
+    }).join('')}</div>` : '<p class="sub" style="margin:0 0 6px">Noch kein Side Deck.</p>'}
+    ${probs.length ? `<div class="notice" style="margin:6px 0;color:var(--bad)">${probs.map(esc).join('<br>')}</div>` : ''}
+    ${msg}
+    <details class="fold"${msg ? ' open' : ''}><summary>${side.length ? '✏️ Side Deck ändern' : '➕ Side Deck einfügen'}</summary><div class="fold-body">
+      <p class="sub" style="margin:0 0 6px">Eine Karte pro Zeile, z. B. „2 Rebuke“ oder „2x Rebuke (OGN) #172“. Du kannst auch die ganze Liste
+        aus TCG Arena / Rift Atlas einfügen – dann zählt nur der Abschnitt „Sideboard:“. Bis ${RULES.SIDE} Karten; die Kopiengrenze von 3 gilt für Haupt- und Side Deck zusammen.</p>
+      <textarea id="side-${esc(p.id)}" rows="6" style="width:100%">${esc(text)}</textarea>
+      <div class="row" style="gap:6px;margin-top:6px">
+        <button class="btn sm primary" data-sidesave="${esc(p.id)}">Side Deck speichern</button>
+        ${side.length ? `<button class="btn sm" data-sideclear="${esc(p.id)}">Side Deck leeren</button>` : ''}
+      </div></div></details>`;
+}
+
+/** Side Deck in der Deck-Ansicht (aus importierten Listen). */
+function sideBlock(d) {
+  if (!d.side?.length) return '';
+  const n = d.side.reduce((s, m) => s + m.count, 0);
+  const probs = checkSide(d.legend, d.main, d.side);
+  return `<h3>Side Deck · ${n}/${RULES.SIDE}</h3>
+    <div class="lines">${d.side.map(m => lineRow(m.count, m.card, null, [], m.count - (m.have ?? m.count))).join('')}</div>
+    ${probs.length ? `<div class="notice" style="margin:6px 0;color:var(--bad)">${probs.map(esc).join('<br>')}</div>` : ''}`;
 }
 
 /**
@@ -1019,11 +1064,12 @@ function pinList(p) {
  */
 function swapPlan(from, to, list) {
   const others = list.filter(p => p !== from && p !== to);
-  const held = k => others.reduce((s, p) => s + (p.main.find(([x]) => x === k)?.[1] ?? 0)
-    + (p.runes.find(([x]) => x === k)?.[1] ?? 0) + (p.battlefields.includes(k) ? 1 : 0), 0);
-  const inFrom = k => (from.main.find(([x]) => x === k)?.[1] ?? 0) + (from.runes.find(([x]) => x === k)?.[1] ?? 0)
-    + (from.battlefields.includes(k) ? 1 : 0);
-  const need = [...to.main, ...to.runes, ...to.battlefields.map(k => [k, 1])];
+  const cnt = (p, k) => [...p.main, ...p.runes, ...(p.side ?? [])].filter(([x]) => x === k).reduce((s, [, n]) => s + n, 0)
+    + (p.battlefields.includes(k) ? 1 : 0);
+  const held = k => others.reduce((s, p) => s + cnt(p, k), 0);
+  const inFrom = k => cnt(from, k);
+  const need = [...[...to.main, ...to.runes, ...(to.side ?? [])].reduce((m, [k, n]) => m.set(k, (m.get(k) ?? 0) + n), new Map()),
+    ...to.battlefields.map(k => [k, 1])];
   const move = [], blocked = [];
   for (const [k, n] of need) {
     const free = Math.max(0, ownedQty(k) - held(k) - inFrom(k));
@@ -1173,7 +1219,7 @@ function viewMeta() {
     <div class="card" style="margin-bottom:6px">
       <p class="sub" style="margin:0 0 10px;font-size:12px">Erkannt werden u. a. „3 Defy“, „3x Defy“, „Defy x3“,
         „2 Onslaught (VEN) #081“ und Abschnitte wie „Legend:“, „Champion:“, „MainDeck:“, „Battlefields:“, „Runes:“.
-        Das Sideboard wird ignoriert. Ohne Namen benennt die App die Liste nach der Legende.</p>
+        Ein Side Deck (Abschnitt „Sideboard:“ oder „Side Deck:“, bis 10 Karten) wird mit übernommen. Ohne Namen benennt die App die Liste nach der Legende.</p>
       <div class="row" style="margin-bottom:10px">
         <input type="text" id="metaName" placeholder="Deckname, z. B. Kennen Tempest (Tier 1)" style="flex:1;min-width:200px">
       </div>
@@ -1498,7 +1544,7 @@ document.addEventListener('click', async e => {
   if (t.dataset.unpin) { store(KEY.pins, pins().filter(p => p.id !== t.dataset.unpin)); return render(); }
   if (t.dataset.pinupdate) {
     const d = currentDeck(t.dataset.pinupdate), old = pinOf(t.dataset.pinupdate);
-    if (d && old) store(KEY.pins, pins().map(p => (p.id === old.id ? snapshot(d, old.status) : p)));
+    if (d && old) store(KEY.pins, pins().map(p => (p.id === old.id ? snapshot(d, old.status, old) : p)));
     return render();
   }
   if (t.dataset.pinstatus) {
@@ -1520,6 +1566,30 @@ document.addEventListener('click', async e => {
   }
   if (t.id === 'copyDeck') return copy(deckToText(detailDeck()), t);
   if (t.id === 'copyArena') return copy(deckToArena(detailDeck()), t);
+  if (t.dataset.sidesave || t.dataset.sideclear) {
+    const id = t.dataset.sidesave ?? t.dataset.sideclear;
+    let side = [], html = 'Side Deck geleert.';
+    if (t.dataset.sidesave) {
+      const text = document.getElementById('side-' + id)?.value ?? '';
+      const parsed = parseDeckList(text);
+      // Ganze Deckliste eingefügt: nur den Sideboard-Abschnitt nehmen, sonst alle Zeilen
+      const rowsIn = parsed.sideboard.length ? parsed.sideboard : parsed.entries;
+      const unknown = [];
+      const found = [];
+      for (const e of rowsIn) {
+        const c = resolve(state.db, e);
+        const card = c ? (state.db.byName.get(key(c)) ?? c) : null;
+        if (card) found.push({ card, count: e.qty }); else unknown.push(e.raw);
+      }
+      side = mergeSide(found).map(m => [key(m.card), m.count]);
+      const n = side.reduce((s, [, c]) => s + c, 0);
+      html = `Side Deck gespeichert: <b>${n} Karten</b>${unknown.length ? `. <b>Nicht erkannt:</b> ${unknown.slice(0, 5).map(esc).join(' · ')}` : ''}.`;
+    }
+    store(KEY.pins, pins().map(p => (p.id === id ? { ...p, side } : p)));
+    state.sideNotice = { id, html };
+    state.pinOpen = id;
+    return render();
+  }
   if (t.dataset.pinarena) {
     const p = pinOf(t.dataset.pinarena);
     if (p) return copy(deckToArena(pinAsDeck(p)), t);
@@ -1539,7 +1609,7 @@ document.addEventListener('click', async e => {
     const name = $('#metaName').value.trim()
       || (parsed.legend ? `${championOf(parsed.legend, state.db.cards) ?? ''} – ${parsed.legend.name}`.replace(/^ – /, '') : 'Unbenanntes Deck');
     state.metaNotice = `Gespeichert: <b>${esc(name)}</b> – ${parsed.legend ? `Legende ${esc(parsed.legend.name)} ${parsed.guessed ? 'aus dem Champion abgeleitet (unten änderbar)' : 'erkannt'}` : '<b>keine Legende erkannt</b> – unten bei der Liste auswählen'},
-      ${cnt} Hauptdeck-Karten${parsed.unknown.length ? `, <b>${parsed.unknown.length} Zeile(n) nicht erkannt:</b> ${parsed.unknown.slice(0, 5).map(esc).join(' · ')}` : ''}.`;
+      ${cnt} Hauptdeck-Karten${parsed.side.length ? `, Side Deck ${parsed.side.reduce((s, m) => s + m.count, 0)} Karten` : ''}${parsed.unknown.length ? `, <b>${parsed.unknown.length} Zeile(n) nicht erkannt:</b> ${parsed.unknown.slice(0, 5).map(esc).join(' · ')}` : ''}.`;
     const own = $('#metaOwn').checked;
     store(KEY.meta, [...read(KEY.meta, []), { id: String(Date.now()), name, text, own }]);
     state.decks = state.imported = state.lists = state.events = null;
@@ -1641,7 +1711,7 @@ document.addEventListener('change', e => {
     state.decks = state.imported = state.lists = state.events = null;
     // Angepinnte Fassung auf die neue Legende umstellen
     const old = pinOf('imp:' + id), d = importedById(id);
-    if (old && d) store(KEY.pins, pins().map(p => (p.id === old.id ? snapshot(d, old.status) : p)));
+    if (old && d) store(KEY.pins, pins().map(p => (p.id === old.id ? snapshot(d, old.status, old) : p)));
     return render();
   }
   if (e.target.id === 'backupFile') {
